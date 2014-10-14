@@ -25,5 +25,7 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     include_package_data = True,
+    setup_requires=["nose>=1.3.0"],
+    test_suite='nose.collector',
 )
 
