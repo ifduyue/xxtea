@@ -43,7 +43,6 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: POSIX',
         'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     setup_requires=["nose>=1.3.0"],
