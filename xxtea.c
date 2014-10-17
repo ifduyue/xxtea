@@ -37,6 +37,11 @@
 #define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
 #endif
 
+#if PY_MAJOR_VERSION >= 3
+#define PyString_FromStringAndSize PyBytes_FromStringAndSize
+#define PyString_AS_STRING PyBytes_AsString
+#endif
+
 enum {
     RESULT_TYPE_RAW = 0,
     RESULT_TYPE_HEX = 1,
@@ -259,7 +264,6 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         }
 
         retbuf = PyString_AS_STRING(retval);
-        s = data;
     }
     else if (result_type == RESULT_TYPE_HEX) {
         retval = PyString_FromStringAndSize(NULL, dlen / 2);
