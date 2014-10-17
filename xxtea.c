@@ -264,6 +264,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         }
 
         retbuf = PyString_AS_STRING(retval);
+        s = data;
     }
     else if (result_type == RESULT_TYPE_HEX) {
         retval = PyString_FromStringAndSize(NULL, dlen / 2);
