@@ -21,8 +21,8 @@ Example
     key = "xxtea is good"
     s = "xxtea is really good"
     
-    enc = encrypt(s, key, True)
-    dec = decrypt(enc, key, True)
+    enc = encrypt(s, key)
+    dec = decrypt(enc, key)
     
     print len(enc), enc
     print len(dec), dec
