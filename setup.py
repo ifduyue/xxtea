@@ -1,22 +1,44 @@
-from setuptools import setup
-import xxtea
-import re
+from setuptools import setup, Extension
+import os
+
+VERSION = "0.1"
+
+if os.name == 'posix':
+    extra_compile_args = [
+        "-std=c99",
+        "-O3",
+        "-Wall",
+        "-W",
+        "-Wundef",
+        # ref: http://bugs.python.org/issue21121
+        "-Wno-error=declaration-after-statement",
+    ]
+else:
+    extra_compile_args = None
+
+define_macros = [
+    ('VERSION', VERSION),
+]
+
+extension = Extension('xxtea', ['xxtea.c'],
+                      extra_compile_args=extra_compile_args,
+                      define_macros=define_macros)
 
 setup(
-    name = "xxtea",
-    version = xxtea.__version__,
-    author = re.sub(r'\s+<.*', r'', xxtea.__author__),
-    author_email = re.sub(r'(^.*<)|(>.*$)', r'', xxtea.__author__),
-    url = xxtea.__url__,
-    description = ("xxtea implemented in pure Python."),
-    long_description = open('README.rst').read(),
-    license = "BSD",
-    keywords = "xxtea",
-    py_modules = ['xxtea'],
-    classifiers = [
+    name="xxtea",
+    version=VERSION,
+    author='Yue Du',
+    author_email='ifduyue@gmail.com',
+    url='https://github.com/ifduyue/xxtea',
+    description="xxtea",
+    long_description=open('README.rst').read(),
+    license="BSD",
+    keywords="xxtea",
+    ext_modules=[extension],
+    classifiers=[
         'Development Status :: 4 - Beta',
         'Programming Language :: Python',
-        #'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Operating System :: POSIX',
@@ -24,8 +46,6 @@ setup(
         'Programming Language :: Python',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    include_package_data = True,
     setup_requires=["nose>=1.3.0"],
     test_suite='nose.collector',
 )
-

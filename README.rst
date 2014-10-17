@@ -3,7 +3,7 @@ xxtea
 
 Description
 ------------
-xxtea implemented in pure Python
+xxtea implemented as a Python extension module.
 
 Installation
 -------------
@@ -18,8 +18,8 @@ Example
 
     from xxtea import decrypt, encrypt
     
-    key = "hey, lyxint"
-    s = "what's up, dude??"
+    key = "xxtea is good"
+    s = "xxtea is really good"
     
     enc = encrypt(s, key, True)
     dec = decrypt(enc, key, True)
