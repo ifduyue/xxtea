@@ -102,7 +102,9 @@ static void btea(uint32_t *v, int n, uint32_t const key[4])
 static int bytes2longs(const char *in, int inlen, uint32_t *out)
 {
     int i;
-    const unsigned char *s = (unsigned char *)in;
+    const unsigned char *s;
+
+    s = (unsigned char *)in;
 
     for (i = 0; i < inlen;  i++) {
         out[i >> 2] |= s[i] << ((i & 3) << 3);
@@ -114,7 +116,9 @@ static int bytes2longs(const char *in, int inlen, uint32_t *out)
 static int longs2bytes(uint32_t *in, int inlen, char *out)
 {
     int i;
-    unsigned char *s = (unsigned char *)out;
+    unsigned char *s;
+
+    s = (unsigned char *)out;
 
     for (i = 0; i < inlen; i++) {
         s[4 * i] = in[i] & 0xFF;
