@@ -218,7 +218,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         retval = PyString_FromStringAndSize(NULL, (alen << 3));
 
         if (!retval) {
-            return NULL;
+            goto cleanup;
         }
 
         retbuf = PyString_AS_STRING(retval);
@@ -229,7 +229,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         retval = PyString_FromStringAndSize(NULL, (alen << 2));
 
         if (!retval) {
-            return NULL;
+            goto cleanup;
         }
 
         retbuf = PyString_AS_STRING(retval);
