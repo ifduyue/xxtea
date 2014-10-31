@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 import os
 
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 
 if os.name == 'posix':
     extra_compile_args = [
