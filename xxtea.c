@@ -184,10 +184,14 @@ static char *keywords[] = {"data", "key", "result_type", NULL};
 static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *data, *key;
-    int alen, dlen, klen, result_type = RESULT_TYPE_DEFAULT;
+    int alen, dlen, klen, result_type;
     PyObject *retval;
     char *retbuf;
     uint32_t *d, k[4];
+
+    d = NULL;
+    retval = NULL;
+    result_type = RESULT_TYPE_DEFAULT;
     k[0] = k[1] = k[2] = k[3] = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &result_type)) {
@@ -229,23 +233,38 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
     else {
         PyErr_SetString(PyExc_TypeError, "Unknown result type.");
-        free(d);
-        return NULL;
+        goto cleanup;
     }
 
     free(d);
 
     return retval;
+
+cleanup:
+
+    if (d) {
+        free(d);
+    }
+
+    if (retval) {
+        Py_DECREF(retval);
+    }
+
+    return NULL;
 }
 
 static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *data, *key;
-    int alen, dlen, klen, rc, result_type = RESULT_TYPE_HEX;
+    int alen, dlen, klen, rc, result_type;
     PyObject *retval;
     char *retbuf, *s;
     uint32_t *d, k[4];
+
+    d = NULL;
+    retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
+    result_type = RESULT_TYPE_HEX;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &result_type)) {
         return NULL;
@@ -278,13 +297,11 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 
         if (rc == 1) {
             PyErr_SetString(PyExc_TypeError, "Length of hex string must be even.");
-            Py_DECREF(retval);
-            return NULL;
+            goto cleanup;
         }
         else if (rc == 2) {
             PyErr_SetString(PyExc_TypeError, "Non-hexadecimal digit found");
-            Py_DECREF(retval);
-            return NULL;
+            goto cleanup;
         }
 
         s = retbuf;
@@ -298,15 +315,16 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     /* not divided by 4, or length < 8 */
     if (dlen & 3 || dlen < 8) {
         PyErr_SetString(PyExc_TypeError, "Invalid data.");
-        Py_DECREF(retval);
-        return NULL;
+        goto cleanup;
     }
 
     alen = dlen / 4;
     d = (uint32_t *)calloc(alen, sizeof(uint32_t));
 
     if (d == NULL) {
-        return PyErr_NoMemory();
+        PyErr_NoMemory();
+        goto cleanup;
+
     }
 
     bytes2longs(s, dlen, d);
@@ -321,6 +339,18 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     free(d);
 
     return retval;
+
+cleanup:
+
+    if (d) {
+        free(d);
+    }
+
+    if (retval) {
+        Py_DECREF(retval);
+    }
+
+    return NULL;
 }
 
 /*****************************************************************************
