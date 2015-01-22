@@ -158,11 +158,11 @@ static void hexlify(const char *in, int inlen, char *out)
 
 static int unhexlify(const char *in, int inlen, char *out)
 {
+    int i, j, top, bot;
+
     if ((inlen & 1) != 0) {
         return 1;
     }
-
-    int i, j, top, bot;
 
     for (i = j = 0; i < inlen; i += 2) {
         top = TO_INT(in[i]);
