@@ -1,8 +1,9 @@
 xxtea
 =====
 
-Description
-------------
+.. image:: https://travis-ci.org/ifduyue/xxtea.png
+    :target: https://travis-ci.org/ifduyue/xxtea
+
 xxtea implemented as a Python extension module.
 
 Installation
