@@ -99,23 +99,37 @@ static void btea(uint32_t *v, int n, uint32_t const key[4])
     }
 }
 
-static int bytes2longs(const char *in, int inlen, uint32_t *out)
+static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
 {
-    int i;
+    int i, pad;
     const unsigned char *s;
 
     s = (unsigned char *)in;
 
+    /* (i & 3) << 3 -> [0, 8, 16, 24] */
     for (i = 0; i < inlen;  i++) {
         out[i >> 2] |= s[i] << ((i & 3) << 3);
     }
 
+    /* PKCS#7 padding */
+    if (padding) {
+        pad = 4 - (inlen & 3);
+        /* make sure lenght of out >= 2 */
+        pad = (inlen < 4) ? pad + 4 : pad;
+        for (i = inlen; i < inlen + pad; i++) {
+            out[i >> 2] |= pad << ((i & 3) << 3);
+        }
+    }
+
+    /* Divided by 4, and then rounded up (ceil) to an integer.
+     * Which is the number of how many longs we've got.
+     */
     return ((i - 1) >> 2) + 1;
 }
 
-static int longs2bytes(uint32_t *in, int inlen, char *out)
+static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
 {
-    int i;
+    int i, pad;
     unsigned char *s;
 
     s = (unsigned char *)out;
@@ -127,12 +141,18 @@ static int longs2bytes(uint32_t *in, int inlen, char *out)
         s[4 * i + 3] = (in[i] >> 24) & 0xFF;
     }
 
-    s[4 * i] = '\0';
+    i *= 4;
 
-    /* count length without tailing nulls */
-    for (i = 4 * i - 1; i >= 0 && s[i] == '\0'; i--) {}
+    /* PKCS#7 unpadding */
+    if (padding) {
+        pad = s[i - 1];
+        i -= pad;
+    }
 
-    return i + 1;
+    s[i] = '\0';
+
+    /* How many bytes we've got */
+    return i;
 }
 
 static void hexlify(const char *in, int inlen, char *out)
@@ -202,16 +222,20 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    alen = (dlen & 3) == 0 ? dlen / 4 : dlen / 4 + 1;
-    alen = alen <= 1 ? 2 : alen;
+    if (klen != 16) {
+        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
+        return NULL;
+    }
+
+    alen = dlen < 4 ? 2 : (dlen >> 2) + 1;
     d = (uint32_t *)calloc(alen, sizeof(uint32_t));
 
     if (d == NULL) {
         return PyErr_NoMemory();
     }
 
-    bytes2longs(data, dlen, d);
-    bytes2longs(key, klen > 16 ? 16 : klen, k);
+    bytes2longs(data, dlen, d, 1);
+    bytes2longs(key, klen, k, 0);
     btea(d, alen, k);
 
     if (result_type == RESULT_TYPE_HEX) {
@@ -222,7 +246,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         }
 
         retbuf = PyString_AS_STRING(retval);
-        longs2bytes(d, alen, retbuf + (alen << 2));
+        longs2bytes(d, alen, retbuf + (alen << 2), 0);
         hexlify(retbuf + (alen << 2), alen << 2, retbuf);
     }
     else if (result_type == RESULT_TYPE_RAW) {
@@ -233,7 +257,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         }
 
         retbuf = PyString_AS_STRING(retval);
-        longs2bytes(d, alen, retbuf);
+        longs2bytes(d, alen, retbuf, 0);
     }
     else {
         PyErr_SetString(PyExc_TypeError, "Unknown result type.");
@@ -271,6 +295,11 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     result_type = RESULT_TYPE_HEX;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &result_type)) {
+        return NULL;
+    }
+
+    if (klen != 16) {
+        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
         return NULL;
     }
 
@@ -331,12 +360,12 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 
     }
 
-    bytes2longs(s, dlen, d);
-    bytes2longs(key, klen > 16 ? 16 : klen, k);
+    bytes2longs(s, dlen, d, 0);
+    bytes2longs(key, klen, k, 0);
     btea(d, -alen, k);
 
-    if ((rc = longs2bytes(d, alen, retbuf)) != dlen) {
-        /* remove trailing null bytes. */
+    if ((rc = longs2bytes(d, alen, retbuf, 1)) != dlen) {
+        /* Remove PKCS#7 padded chars */
         Py_SIZE(retval) = rc;
     }
 

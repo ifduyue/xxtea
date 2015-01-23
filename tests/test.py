@@ -1,20 +1,35 @@
 import unittest
 import random
 import xxtea
+import os
 
 
 class TestXXTEA(unittest.TestCase):
 
     def test_encrypt(self):
-        self.assertEqual(xxtea.encrypt('How do you do?', 'Fine. And you?'), b'dd2c3bffc7b08b20c2700eb51539c18f')
+        self.assertEqual(xxtea.encrypt('How do you do?', 'Fine. And you?  '), b'78f465eb1b4985887d11842ede853621')
 
     def test_decrypt(self):
-        self.assertEqual(xxtea.decrypt('dd2c3bffc7b08b20c2700eb51539c18f', 'Fine. And you?'), b'How do you do?')
+        self.assertEqual(xxtea.decrypt('78f465eb1b4985887d11842ede853621', 'Fine. And you?  '), b'How do you do?')
 
     def test_raw(self):
-        enc = xxtea.encrypt('How do you do?', 'Fine. And you?', xxtea.RESULT_TYPE_RAW)
-        dec = xxtea.decrypt(enc, 'Fine. And you?', xxtea.RESULT_TYPE_RAW)
-        self.assertEqual(b'How do you do?', dec)
+        encd = xxtea.encrypt('How do you do?', 'Fine. And you?  ', xxtea.RESULT_TYPE_RAW)
+        decd = xxtea.decrypt(encd, 'Fine. And you?  ', xxtea.RESULT_TYPE_RAW)
+        self.assertEqual(b'How do you do?', decd)
+
+    def test_urandom(self):
+        for i in range(100):
+            key = os.urandom(16)
+
+            data = os.urandom(i)
+            encd = xxtea.encrypt(data, key)
+            decd = xxtea.decrypt(encd, key)
+            self.assertEqual(data, decd)
+
+            data = b'\0' * i
+            encd = xxtea.encrypt(data, key)
+            decd = xxtea.decrypt(encd, key)
+            self.assertEqual(data, decd)
 
 
 if __name__ == '__main__':
