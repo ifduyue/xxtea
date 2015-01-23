@@ -17,11 +17,12 @@ Example
 -----------
 .. code-block:: python
 
+    import os
     from xxtea import decrypt, encrypt
-    
-    key = "xxtea is good"
-    s = "xxtea is really good"
-    
+
+    key = os.urandom(16)  # Key must be a 16-byte string.
+    s = "xxtea is good"
+
     enc = encrypt(s, key)
     dec = decrypt(enc, key)
     
