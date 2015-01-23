@@ -14,7 +14,7 @@ Installation
 
 Example
 -----------
-::
+.. code-block:: python
 
     from xxtea import decrypt, encrypt
     
