@@ -24,7 +24,7 @@ In this implementation,  the conversions between bytes and array are
 taken care of by longs2bytes_ and bytes2longs_. `PKCS#7`_ padding is also used
 to make sure that the input bytes are padded to multiple of 4-byte (the size
 of a 32-bit integer) and at least 8-byte long (the size of two 32-bit integer,
-which is required by The XXTEA_ algorithm). As a result of these mesures,
+which is required by The XXTEA_ algorithm). As a result of these measures,
 you can encrypt not only texts, but also any binary bytes of any length.
 
 
