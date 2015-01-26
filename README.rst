@@ -4,6 +4,10 @@ xxtea
 .. image:: https://travis-ci.org/ifduyue/xxtea.png
     :target: https://travis-ci.org/ifduyue/xxtea
 
+.. image:: https://pypip.in/version/xxtea/badge.svg?text=pypi
+    :target: https://pypi.python.org/pypi/xxtea
+    :alt: Latest Version
+
 .. _XXTEA: http://en.wikipedia.org/wiki/XXTEA
 .. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L130
 .. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L102
