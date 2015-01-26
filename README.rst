@@ -8,7 +8,7 @@ xxtea
 .. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L130
 .. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L102
 
-XXTEA_ implemented as a Python extension module.
+XXTEA_ implemented as a Python extension module, licensed under 2-clause BSD.
 
 The XXTEA_ algorithm takes a 128-bit key and operates on an array of 32-bit
 integers (at least 2 integers), but it doesn't define the conversions between
