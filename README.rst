@@ -1,10 +1,10 @@
-xxtea
-=====
+xxtea |travis-badge| |pypi-badge|
+==================================
 
-.. image:: https://travis-ci.org/ifduyue/xxtea.png
+.. |travis-badge| image:: https://travis-ci.org/ifduyue/xxtea.png
     :target: https://travis-ci.org/ifduyue/xxtea
 
-.. image:: https://pypip.in/version/xxtea/badge.svg?text=pypi&style=flat
+.. |pypi-badge| image:: https://pypip.in/version/xxtea/badge.svg?text=pypi&style=flat
     :target: https://pypi.python.org/pypi/xxtea
     :alt: Latest Version
 
