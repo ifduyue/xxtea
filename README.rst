@@ -70,5 +70,5 @@ representation. They are exactly equivalent to:
 .. code-block:: python
 
     >>> hexenc = xxtea.encrypt(s, key).encode('hex')
-    >>> s = xxtea.decrypt(hexenc.decode('hex'), key)
+    >>> s == xxtea.decrypt(hexenc.decode('hex'), key)
     True
