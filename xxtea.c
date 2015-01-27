@@ -42,13 +42,6 @@
 #define PyString_AS_STRING PyBytes_AsString
 #endif
 
-enum {
-    RESULT_TYPE_RAW = 0,
-    RESULT_TYPE_HEX = 1,
-    RESULT_TYPE_DEFAULT = 1
-};
-
-
 #define DELTA 0x9e3779b9
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
 
@@ -203,22 +196,21 @@ static int unhexlify(const char *in, int inlen, char *out)
  * Module Functions ***********************************************************
  ****************************************************************************/
 
-static char *keywords[] = {"data", "key", "result_type", NULL};
+static char *keywords[] = {"data", "key", NULL};
 
 static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *data, *key;
-    int alen, dlen, klen, result_type;
+    int alen, dlen, klen;
     PyObject *retval;
     char *retbuf;
     uint32_t *d, k[4];
 
     d = NULL;
     retval = NULL;
-    result_type = RESULT_TYPE_DEFAULT;
     k[0] = k[1] = k[2] = k[3] = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &result_type)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
         return NULL;
     }
 
@@ -238,31 +230,73 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     bytes2longs(key, klen, k, 0);
     btea(d, alen, k);
 
-    if (result_type == RESULT_TYPE_HEX) {
-        retval = PyString_FromStringAndSize(NULL, (alen << 3));
+    retval = PyString_FromStringAndSize(NULL, (alen << 2));
 
-        if (!retval) {
-            goto cleanup;
-        }
-
-        retbuf = PyString_AS_STRING(retval);
-        longs2bytes(d, alen, retbuf + (alen << 2), 0);
-        hexlify(retbuf + (alen << 2), alen << 2, retbuf);
-    }
-    else if (result_type == RESULT_TYPE_RAW) {
-        retval = PyString_FromStringAndSize(NULL, (alen << 2));
-
-        if (!retval) {
-            goto cleanup;
-        }
-
-        retbuf = PyString_AS_STRING(retval);
-        longs2bytes(d, alen, retbuf, 0);
-    }
-    else {
-        PyErr_SetString(PyExc_TypeError, "Unknown result type.");
+    if (!retval) {
         goto cleanup;
     }
+
+    retbuf = PyString_AS_STRING(retval);
+    longs2bytes(d, alen, retbuf, 0);
+
+    free(d);
+
+    return retval;
+
+cleanup:
+
+    if (d) {
+        free(d);
+    }
+
+    if (retval) {
+        Py_DECREF(retval);
+    }
+
+    return NULL;
+}
+
+static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *data, *key;
+    int alen, dlen, klen;
+    PyObject *retval;
+    char *retbuf;
+    uint32_t *d, k[4];
+
+    d = NULL;
+    retval = NULL;
+    k[0] = k[1] = k[2] = k[3] = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
+        return NULL;
+    }
+
+    if (klen != 16) {
+        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
+        return NULL;
+    }
+
+    alen = dlen < 4 ? 2 : (dlen >> 2) + 1;
+    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
+
+    if (d == NULL) {
+        return PyErr_NoMemory();
+    }
+
+    bytes2longs(data, dlen, d, 1);
+    bytes2longs(key, klen, k, 0);
+    btea(d, alen, k);
+
+    retval = PyString_FromStringAndSize(NULL, (alen << 3));
+
+    if (!retval) {
+        goto cleanup;
+    }
+
+    retbuf = PyString_AS_STRING(retval);
+    longs2bytes(d, alen, retbuf + (alen << 2), 0);
+    hexlify(retbuf + (alen << 2), alen << 2, retbuf);
 
     free(d);
 
@@ -284,7 +318,7 @@ cleanup:
 static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *data, *key;
-    int alen, dlen, klen, rc, result_type;
+    int alen, dlen, klen, rc;
     PyObject *retval;
     char *retbuf, *s;
     uint32_t *d, k[4];
@@ -292,9 +326,8 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     d = NULL;
     retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
-    result_type = RESULT_TYPE_HEX;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &result_type)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
         return NULL;
     }
 
@@ -303,47 +336,96 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    if (result_type != RESULT_TYPE_HEX && result_type != RESULT_TYPE_RAW) {
-        PyErr_SetString(PyExc_TypeError, "Unknown result type.");
+    retval = PyString_FromStringAndSize(NULL, dlen);
+
+    if (!retval) {
         return NULL;
     }
 
-    if (result_type == RESULT_TYPE_RAW) {
-        retval = PyString_FromStringAndSize(NULL, dlen);
+    retbuf = PyString_AS_STRING(retval);
+    s = data;
 
-        if (!retval) {
-            return NULL;
-        }
-
-        retbuf = PyString_AS_STRING(retval);
-        s = data;
+    /* not divided by 4, or length < 8 */
+    if (dlen & 3 || dlen < 8) {
+        PyErr_SetString(PyExc_TypeError, "Invalid data.");
+        goto cleanup;
     }
-    else if (result_type == RESULT_TYPE_HEX) {
-        retval = PyString_FromStringAndSize(NULL, dlen / 2);
 
-        if (!retval) {
-            return NULL;
-        }
+    alen = dlen / 4;
+    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
 
-        retbuf = PyString_AS_STRING(retval);
-        rc = unhexlify(data, dlen, retbuf);
+    if (d == NULL) {
+        PyErr_NoMemory();
+        goto cleanup;
 
-        if (rc == 1) {
-            PyErr_SetString(PyExc_TypeError, "Length of hex string must be even.");
-            goto cleanup;
-        }
-        else if (rc == 2) {
-            PyErr_SetString(PyExc_TypeError, "Non-hexadecimal digit found");
-            goto cleanup;
-        }
-
-        s = retbuf;
-        dlen /= 2;
     }
-    else {
-        PyErr_SetString(PyExc_TypeError, "Unknown result type.");
+
+    bytes2longs(s, dlen, d, 0);
+    bytes2longs(key, klen, k, 0);
+    btea(d, -alen, k);
+
+    if ((rc = longs2bytes(d, alen, retbuf, 1)) != dlen) {
+        /* Remove PKCS#7 padded chars */
+        Py_SIZE(retval) = rc;
+    }
+
+    free(d);
+
+    return retval;
+
+cleanup:
+
+    if (d) {
+        free(d);
+    }
+
+    if (retval) {
+        Py_DECREF(retval);
+    }
+
+    return NULL;
+}
+
+static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    const char *data, *key;
+    int alen, dlen, klen, rc;
+    PyObject *retval;
+    char *retbuf, *s;
+    uint32_t *d, k[4];
+
+    d = NULL;
+    retval = NULL;
+    k[0] = k[1] = k[2] = k[3] = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
         return NULL;
     }
+
+    if (klen != 16) {
+        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
+        return NULL;
+    }
+
+    retval = PyString_FromStringAndSize(NULL, dlen / 2);
+    if (!retval) {
+        return NULL;
+    }
+
+    retbuf = PyString_AS_STRING(retval);
+    rc = unhexlify(data, dlen, retbuf);
+
+    if (rc == 1) {
+        PyErr_SetString(PyExc_TypeError, "Length of hex string must be even.");
+        goto cleanup;
+    }
+    else if (rc == 2) {
+        PyErr_SetString(PyExc_TypeError, "Non-hexadecimal digit found");
+        goto cleanup;
+    }
+
+    s = retbuf;
+    dlen /= 2;
 
     /* not divided by 4, or length < 8 */
     if (dlen & 3 || dlen < 8) {
@@ -406,6 +488,8 @@ static struct module_state _state;
 static PyMethodDef methods[] = {
     {"encrypt", (PyCFunction)xxtea_encrypt, METH_VARARGS | METH_KEYWORDS, "encrypt"},
     {"decrypt", (PyCFunction)xxtea_decrypt, METH_VARARGS | METH_KEYWORDS, "decrypt"},
+    {"encrypt_hex", (PyCFunction)xxtea_encrypt_hex, METH_VARARGS | METH_KEYWORDS, "encrypt_hex"},
+    {"decrypt_hex", (PyCFunction)xxtea_decrypt_hex, METH_VARARGS | METH_KEYWORDS, "decrypt_hex"},
     {NULL, NULL, 0, NULL}
 };
 
@@ -469,8 +553,6 @@ void initxxtea(void)
     }
 
     PyModule_AddStringConstant(module, "VERSION", VALUE_TO_STRING(VERSION));
-    PyModule_AddIntConstant(module, "RESULT_TYPE_RAW", RESULT_TYPE_RAW);
-    PyModule_AddIntConstant(module, "RESULT_TYPE_HEX", RESULT_TYPE_HEX);
 
 #if PY_MAJOR_VERSION >= 3
     return module;

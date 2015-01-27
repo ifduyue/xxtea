@@ -30,25 +30,45 @@ you can encrypt not only texts, but also any binary bytes of any length.
 
 Installation
 -------------
+
 ::
-    
+
     $ pip install xxtea -U
 
 
 Example
 -----------
+
+This module provides four functions: ``encrypt()``, ``decrypt()``,
+``encrypt_hex()``, and ``decrypt_hex()``.
+
 .. code-block:: python
 
-    import os
-    from xxtea import decrypt, encrypt
+    >>> import os
+    >>> import xxtea
+    >>> 
+    >>> key = os.urandom(16)  # Key must be a 16-byte string.
+    >>> s = "xxtea is good"
+    >>> 
+    >>> enc = xxtea.encrypt(s, key)
+    >>> dec = xxtea.decrypt(enc, key)
+    >>> s == dec
+    True
+    >>> 
+    >>> hexenc = xxtea.encrypt_hex(s, key)
+    >>> hexenc
+    'd1d8e82461dd5828397c32ad265ee225'
+    >>> s == xxtea.decrypt_hex(hexenc, key)
+    True
+    >>> 
+    >>> enc.encode('hex') == hexenc
+    True
 
-    key = os.urandom(16)  # Key must be a 16-byte string.
-    s = "xxtea is good"
+``encrypt_hex()`` and ``decrypt_hex()`` operate on ciphertext in a hexadecimal
+representation. They are exactly equivalent to:
 
-    enc = encrypt(s, key)
-    dec = decrypt(enc, key)
-    
-    print len(enc), enc
-    print len(dec), dec
-    assert s == dec
+.. code-block:: python
 
+    >>> hexenc = xxtea.encrypt(s, key).encode('hex')
+    >>> s = xxtea.decrypt(hexenc.decode('hex'), key)
+    True
