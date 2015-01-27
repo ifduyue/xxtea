@@ -16,7 +16,7 @@ class TestXXTEA(unittest.TestCase):
         self.assertEqual(b'How do you do?', decd)
 
     def test_urandom(self):
-        for i in range(100):
+        for i in range(2048):
             key = os.urandom(16)
 
             data = os.urandom(i)
