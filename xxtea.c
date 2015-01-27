@@ -198,6 +198,12 @@ static int unhexlify(const char *in, int inlen, char *out)
 
 static char *keywords[] = {"data", "key", NULL};
 
+
+PyDoc_STRVAR(
+    xxtea_encrypt_doc,
+    "encrypt (data, key)\n\n"
+    "Encrypt `data` with a 16-byte `key`, return binary bytes.");
+
 static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *data, *key;
@@ -255,6 +261,11 @@ cleanup:
 
     return NULL;
 }
+
+PyDoc_STRVAR(
+    xxtea_encrypt_hex_doc,
+    "encrypt_hex (data, key)\n\n"
+    "Encrypt `data` with a 16-byte `key`, return hex encoded bytes.");
 
 static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -314,6 +325,11 @@ cleanup:
 
     return NULL;
 }
+
+PyDoc_STRVAR(
+    xxtea_decrypt_doc,
+    "decrypt (data, key)\n\n"
+    "Decrypt `data` with a 16-byte `key`, return original bytes.");
 
 static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -385,6 +401,11 @@ cleanup:
 
     return NULL;
 }
+
+PyDoc_STRVAR(
+    xxtea_decrypt_hex_doc,
+    "decrypt_hex (data, key)\n\n"
+    "Decrypt hex encoded `data` with a 16-byte `key`, return original bytes.");
 
 static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -486,10 +507,10 @@ static struct module_state _state;
 #endif
 
 static PyMethodDef methods[] = {
-    {"encrypt", (PyCFunction)xxtea_encrypt, METH_VARARGS | METH_KEYWORDS, "encrypt"},
-    {"decrypt", (PyCFunction)xxtea_decrypt, METH_VARARGS | METH_KEYWORDS, "decrypt"},
-    {"encrypt_hex", (PyCFunction)xxtea_encrypt_hex, METH_VARARGS | METH_KEYWORDS, "encrypt_hex"},
-    {"decrypt_hex", (PyCFunction)xxtea_decrypt_hex, METH_VARARGS | METH_KEYWORDS, "decrypt_hex"},
+    {"encrypt", (PyCFunction)xxtea_encrypt, METH_VARARGS | METH_KEYWORDS, xxtea_encrypt_doc},
+    {"decrypt", (PyCFunction)xxtea_decrypt, METH_VARARGS | METH_KEYWORDS, xxtea_decrypt_doc},
+    {"encrypt_hex", (PyCFunction)xxtea_encrypt_hex, METH_VARARGS | METH_KEYWORDS, xxtea_encrypt_hex_doc},
+    {"decrypt_hex", (PyCFunction)xxtea_decrypt_hex, METH_VARARGS | METH_KEYWORDS, xxtea_decrypt_hex_doc},
     {NULL, NULL, 0, NULL}
 };
 
