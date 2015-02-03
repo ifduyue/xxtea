@@ -336,7 +336,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     const char *data, *key;
     int alen, dlen, klen, rc;
     PyObject *retval;
-    char *retbuf, *s;
+    char *retbuf;
     uint32_t *d, k[4];
 
     d = NULL;
@@ -359,7 +359,6 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     retbuf = PyString_AS_STRING(retval);
-    s = data;
 
     /* not divided by 4, or length < 8 */
     if (dlen & 3 || dlen < 8) {
@@ -376,7 +375,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 
     }
 
-    bytes2longs(s, dlen, d, 0);
+    bytes2longs(data, dlen, d, 0);
     bytes2longs(key, klen, k, 0);
     btea(d, -alen, k);
 
@@ -412,7 +411,7 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     const char *data, *key;
     int alen, dlen, klen, rc;
     PyObject *retval;
-    char *retbuf, *s;
+    char *retbuf;
     uint32_t *d, k[4];
 
     d = NULL;
@@ -445,7 +444,6 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
         goto cleanup;
     }
 
-    s = retbuf;
     dlen /= 2;
 
     /* not divided by 4, or length < 8 */
@@ -463,7 +461,7 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
 
     }
 
-    bytes2longs(s, dlen, d, 0);
+    bytes2longs(retbuf, dlen, d, 0);
     bytes2longs(key, klen, k, 0);
     btea(d, -alen, k);
 
