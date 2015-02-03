@@ -99,7 +99,7 @@ static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
     int i, pad;
     const unsigned char *s;
 
-    s = (unsigned char *)in;
+    s = (const unsigned char *)in;
 
     /* (i & 3) << 3 -> [0, 8, 16, 24] */
     for (i = 0; i < inlen;  i++) {
