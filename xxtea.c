@@ -495,16 +495,7 @@ cleanup:
 
 /* ref: https://docs.python.org/2/howto/cporting.html */
 
-struct module_state {
-    PyObject *error;
-};
 
-#if PY_MAJOR_VERSION >= 3
-#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
-#else
-#define GETSTATE(m) (&_state)
-static struct module_state _state;
-#endif
 
 static PyMethodDef methods[] = {
     {"encrypt", (PyCFunction)xxtea_encrypt, METH_VARARGS | METH_KEYWORDS, xxtea_encrypt_doc},
@@ -516,28 +507,15 @@ static PyMethodDef methods[] = {
 
 #if PY_MAJOR_VERSION >= 3
 
-static int myextension_traverse(PyObject *m, visitproc visit, void *arg)
-{
-    Py_VISIT(GETSTATE(m)->error);
-    return 0;
-}
-
-static int myextension_clear(PyObject *m)
-{
-    Py_CLEAR(GETSTATE(m)->error);
-    return 0;
-}
-
-
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "xxtea",
     NULL,
-    sizeof(struct module_state),
+    -1,
     methods,
     NULL,
-    myextension_traverse,
-    myextension_clear,
+    NULL,
+    NULL,
     NULL
 };
 
@@ -546,13 +524,13 @@ static struct PyModuleDef moduledef = {
 PyObject *PyInit_xxtea(void)
 
 #else
+
 #define INITERROR return
 
 void initxxtea(void)
 #endif
 {
     PyObject *module;
-    struct module_state *st;
 
 #if PY_MAJOR_VERSION >= 3
     module = PyModule_Create(&moduledef);
@@ -561,15 +539,6 @@ void initxxtea(void)
 #endif
 
     if (module == NULL) {
-        INITERROR;
-    }
-
-    st = GETSTATE(module);
-
-    st->error = PyErr_NewException("xxtea.Error", NULL, NULL);
-
-    if (st->error == NULL) {
-        Py_DECREF(module);
         INITERROR;
     }
 
