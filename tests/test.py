@@ -6,22 +6,26 @@ import xxtea
 
 
 class TestXXTEA(unittest.TestCase):
+    data = b'How do you do?'
+    key = b'Fine. And you?  '
+    enc = b'x\xf4e\xeb\x1bI\x85\x88}\x11\x84.\xde\x856!'
+    hexenc = b'78f465eb1b4985887d11842ede853621'
 
-    def test_hex(self):
-        data = b'How do you do?'
-        key = b'Fine. And you?  '
-        hexenc = b'78f465eb1b4985887d11842ede853621'
-        self.assertEqual(xxtea.encrypt_hex(data, key), hexenc)
-        self.assertEqual(xxtea.decrypt_hex(hexenc, key), data)
+    def test_encrypt(self):
+        enc = xxtea.encrypt(self.data, self.key)
+        self.assertEqual(enc, self.enc)
 
-    def test_raw(self):
-        data = b'How do you do?'
-        key = b'Fine. And you?  '
-        hexenc = b'78f465eb1b4985887d11842ede853621'
-        enc = binascii.a2b_hex(hexenc)
+    def test_encrypt_hex(self):
+        hexenc = xxtea.encrypt_hex(self.data, self.key)
+        self.assertEqual(hexenc, self.hexenc)
 
-        self.assertEqual(xxtea.encrypt(data, key), enc)
-        self.assertEqual(xxtea.decrypt(enc, key), data)
+    def test_decrypt(self):
+        data = xxtea.decrypt(self.enc, self.key)
+        self.assertEqual(data, self.data)
+
+    def test_decrypt_hex(self):
+        data = xxtea.decrypt_hex(self.hexenc, self.key)
+        self.assertEqual(data, self.data)
 
     def test_urandom(self):
         for i in range(2048):
