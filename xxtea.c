@@ -45,6 +45,8 @@
 #define DELTA 0x9e3779b9
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
 
+static PyObject *module, *binascii;
+
 
 static void btea(uint32_t *v, int n, uint32_t const key[4])
 {
@@ -148,50 +150,6 @@ static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
     return i;
 }
 
-static void hexlify(const char *in, int inlen, char *out)
-{
-    int i, j;
-    char c;
-
-    for (i = j = 0; i < inlen; i++) {
-        c = (in[i] >> 4) & 0xf;
-        c = (c > 9) ? c + 'a' - 10 : c + '0';
-        out[j++] = c;
-        c = in[i] & 0xf;
-        c = (c > 9) ? c + 'a' - 10 : c + '0';
-        out[j++] = c;
-    }
-
-    out[j++] = '\0';
-}
-
-#define TO_INT(c) ((c >= '0' && c <= '9') ? c - '0' : \
-                   (c >= 'a' && c <= 'f') ? c - 'a' + 10 : \
-                   (c >= 'A' && c <= 'F') ? c - 'A' + 10 : -1)
-
-static int unhexlify(const char *in, int inlen, char *out)
-{
-    int i, j, top, bot;
-
-    if ((inlen & 1) != 0) {
-        return 1;
-    }
-
-    for (i = j = 0; i < inlen; i += 2) {
-        top = TO_INT(in[i]);
-        bot = TO_INT(in[i + 1]);
-
-        if (top == -1 || bot == -1) {
-            return 2;
-        }
-
-        out[j++] = (top << 4) + bot;
-    }
-
-    out[j] = '\0';
-    return 0;
-}
-
 /*****************************************************************************
  * Module Functions ***********************************************************
  ****************************************************************************/
@@ -269,61 +227,15 @@ PyDoc_STRVAR(
 
 static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    const char *data, *key;
-    int alen, dlen, klen;
-    PyObject *retval;
-    char *retbuf;
-    uint32_t *d, k[4];
+    PyObject *retval, *tmp;
+    retval = tmp = NULL;
 
-    d = NULL;
-    retval = NULL;
-    k[0] = k[1] = k[2] = k[3] = 0;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
-        return NULL;
+    tmp = xxtea_encrypt(self, args, kwargs);
+    if (!(retval = PyObject_CallMethodObjArgs(binascii, PyUnicode_FromString("hexlify"), tmp, NULL))) {
+        Py_XDECREF(tmp);
     }
-
-    if (klen != 16) {
-        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
-        return NULL;
-    }
-
-    alen = dlen < 4 ? 2 : (dlen >> 2) + 1;
-    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
-
-    if (d == NULL) {
-        return PyErr_NoMemory();
-    }
-
-    bytes2longs(data, dlen, d, 1);
-    bytes2longs(key, klen, k, 0);
-    btea(d, alen, k);
-
-    retval = PyString_FromStringAndSize(NULL, (alen << 3));
-
-    if (!retval) {
-        goto cleanup;
-    }
-
-    retbuf = PyString_AS_STRING(retval);
-    longs2bytes(d, alen, retbuf + (alen << 2), 0);
-    hexlify(retbuf + (alen << 2), alen << 2, retbuf);
-
-    free(d);
 
     return retval;
-
-cleanup:
-
-    if (d) {
-        free(d);
-    }
-
-    if (retval) {
-        Py_DECREF(retval);
-    }
-
-    return NULL;
 }
 
 PyDoc_STRVAR(
@@ -409,84 +321,21 @@ PyDoc_STRVAR(
 
 static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    const char *data, *key;
-    int alen, dlen, klen, rc;
-    PyObject *retval;
-    char *retbuf, *s;
-    uint32_t *d, k[4];
+    PyObject *data, *key, *retval, *tmp;
+    data = key = retval = tmp = NULL;
 
-    d = NULL;
-    retval = NULL;
-    k[0] = k[1] = k[2] = k[3] = 0;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "SS", keywords, &data, &key)) {
         return NULL;
     }
 
-    if (klen != 16) {
-        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
+    if (!(tmp = PyObject_CallMethodObjArgs(binascii, PyUnicode_FromString("unhexlify"), data, NULL))) {
         return NULL;
     }
 
-    retval = PyString_FromStringAndSize(NULL, dlen / 2);
-    if (!retval) {
-        return NULL;
-    }
-
-    retbuf = PyString_AS_STRING(retval);
-    rc = unhexlify(data, dlen, retbuf);
-
-    if (rc == 1) {
-        PyErr_SetString(PyExc_TypeError, "Length of hex string must be even.");
-        goto cleanup;
-    }
-    else if (rc == 2) {
-        PyErr_SetString(PyExc_TypeError, "Non-hexadecimal digit found");
-        goto cleanup;
-    }
-
-    s = retbuf;
-    dlen /= 2;
-
-    /* not divided by 4, or length < 8 */
-    if (dlen & 3 || dlen < 8) {
-        PyErr_SetString(PyExc_TypeError, "Invalid data.");
-        goto cleanup;
-    }
-
-    alen = dlen / 4;
-    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
-
-    if (d == NULL) {
-        PyErr_NoMemory();
-        goto cleanup;
-
-    }
-
-    bytes2longs(s, dlen, d, 0);
-    bytes2longs(key, klen, k, 0);
-    btea(d, -alen, k);
-
-    if ((rc = longs2bytes(d, alen, retbuf, 1)) != dlen) {
-        /* Remove PKCS#7 padded chars */
-        Py_SIZE(retval) = rc;
-    }
-
-    free(d);
+    retval = PyObject_CallMethodObjArgs(module, PyUnicode_FromString("decrypt"), tmp, key, NULL);
+    Py_DECREF(tmp);
 
     return retval;
-
-cleanup:
-
-    if (d) {
-        free(d);
-    }
-
-    if (retval) {
-        Py_DECREF(retval);
-    }
-
-    return NULL;
 }
 
 /*****************************************************************************
@@ -530,8 +379,6 @@ PyObject *PyInit_xxtea(void)
 void initxxtea(void)
 #endif
 {
-    PyObject *module;
-
 #if PY_MAJOR_VERSION >= 3
     module = PyModule_Create(&moduledef);
 #else
@@ -539,6 +386,10 @@ void initxxtea(void)
 #endif
 
     if (module == NULL) {
+        INITERROR;
+    }
+    if (!(binascii = PyImport_ImportModule("binascii"))) {
+        Py_DECREF(module);
         INITERROR;
     }
 
