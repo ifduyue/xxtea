@@ -233,10 +233,12 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     PyObject *retval, *tmp;
     retval = tmp = NULL;
 
-    tmp = xxtea_encrypt(self, args, kwargs);
-    if (!(retval = PyObject_CallMethodObjArgs(binascii, _xxtea_pyunicode_hexlify, tmp, NULL))) {
-        Py_XDECREF(tmp);
+    if (!(tmp = xxtea_encrypt(self, args, kwargs))) {
+        return NULL;
     }
+
+    retval = PyObject_CallMethodObjArgs(binascii, _xxtea_pyunicode_hexlify, tmp, NULL);
+    Py_DECREF(tmp);
 
     return retval;
 }
