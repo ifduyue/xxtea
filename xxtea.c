@@ -46,6 +46,9 @@
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
 
 static PyObject *module, *binascii;
+static PyObject *_xxtea_pyunicode_hexlify;
+static PyObject *_xxtea_pyunicode_unhexlify;
+static PyObject *_xxtea_pyunicode_decrypt;
 
 
 static void btea(uint32_t *v, int n, uint32_t const key[4])
@@ -231,7 +234,7 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     retval = tmp = NULL;
 
     tmp = xxtea_encrypt(self, args, kwargs);
-    if (!(retval = PyObject_CallMethodObjArgs(binascii, PyUnicode_FromString("hexlify"), tmp, NULL))) {
+    if (!(retval = PyObject_CallMethodObjArgs(binascii, _xxtea_pyunicode_hexlify, tmp, NULL))) {
         Py_XDECREF(tmp);
     }
 
@@ -327,11 +330,11 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
         return NULL;
     }
 
-    if (!(tmp = PyObject_CallMethodObjArgs(binascii, PyUnicode_FromString("unhexlify"), data, NULL))) {
+    if (!(tmp = PyObject_CallMethodObjArgs(binascii, _xxtea_pyunicode_unhexlify, data, NULL))) {
         return NULL;
     }
 
-    retval = PyObject_CallMethodObjArgs(module, PyUnicode_FromString("decrypt"), tmp, key, NULL);
+    retval = PyObject_CallMethodObjArgs(module, _xxtea_pyunicode_decrypt, tmp, key, NULL);
     Py_DECREF(tmp);
 
     return retval;
@@ -391,6 +394,10 @@ void initxxtea(void)
         Py_DECREF(module);
         INITERROR;
     }
+
+    _xxtea_pyunicode_hexlify = PyUnicode_FromString("hexlify");
+    _xxtea_pyunicode_unhexlify = PyUnicode_FromString("unhexlify");
+    _xxtea_pyunicode_decrypt = PyUnicode_FromString("decrypt");
 
     PyModule_AddStringConstant(module, "VERSION", VALUE_TO_STRING(VERSION));
 
