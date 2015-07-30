@@ -41,6 +41,8 @@ Usage
 This module provides four functions: ``encrypt()``, ``decrypt()``,
 ``encrypt_hex()``, and ``decrypt_hex()``.
 
+Python 2:
+
 .. code-block:: python
 
     >>> import os
@@ -63,11 +65,45 @@ This module provides four functions: ``encrypt()``, ``decrypt()``,
     >>> enc.encode('hex') == hexenc
     True
 
+Python 3:
+
+.. code-block:: Python
+
+    >>> import os
+    >>> import xxtea
+    >>> import binascii
+    >>> 
+    >>> key = os.urandom(16)  # Key must be a 16-byte string.
+    >>> s = b"xxtea is good"
+    >>> 
+    >>> enc = xxtea.encrypt(s, key)
+    >>> dec = xxtea.decrypt(enc, key)
+    >>> s == dec
+    True
+    >>> 
+    >>> hexenc = xxtea.encrypt_hex(s, key)
+    >>> hexenc
+    b'7ad85672d770fb5cf636c49d57e732ae'
+    >>> s == xxtea.decrypt_hex(hexenc, key)
+    True
+    >>> 
+    >>> binascii.hexlify(enc) == hexenc
+
 ``encrypt_hex()`` and ``decrypt_hex()`` operate on ciphertext in a hexadecimal
 representation. They are exactly equivalent to:
+
+Python 2:
 
 .. code-block:: python
 
     >>> hexenc = xxtea.encrypt(s, key).encode('hex')
     >>> s == xxtea.decrypt(hexenc.decode('hex'), key)
+    True
+
+Python 3:
+
+.. code-block:: python
+
+    >>> hexenc = binascii.hexlify(xxtea.encrypt(s, key))
+    >>> s == xxtea.decrypt(binascii.unhexlify(hexenc), key)
     True
