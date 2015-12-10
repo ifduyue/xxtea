@@ -301,7 +301,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
     else {
         /* Illegal PKCS#7 padding */
-        PyErr_SetString(PyExc_ValueError, "Invalid data, illegal PKCS#7 padding. Could be using an wrong key.");
+        PyErr_SetString(PyExc_ValueError, "Invalid data, illegal PKCS#7 padding. Could be using a wrong key.");
         goto cleanup;
     }
 
