@@ -2,6 +2,8 @@
 
 PYTHON=${PYTHON-`which python`}
 
+echo Benchmarking ...
+
 echo -n "    encrypt: "
 $PYTHON -mtimeit -s 'import xxtea' -s 'import os' -s 'key = os.urandom(16)' -s 'data = os.urandom(1000)' 'xxtea.encrypt(data, key)'
 

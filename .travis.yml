@@ -9,3 +9,4 @@ python:
 install:
   - gcc --version
 script: python setup.py test
+after_success: bash bench.sh
