@@ -111,7 +111,7 @@ Python 3:
 Catching Exceptions
 ---------------------
 
-It is possible to throw an ``ValueError`` or a ``TypeError`` during calling
+It is possible to throw a ``ValueError`` or a ``TypeError`` during calling
 ``decrypt()`` and ``decrypt_hex()``. Better to catch them, or your program
 would exit.
 
@@ -133,7 +133,7 @@ would exit.
     >>> try_catch(xxtea.decrypt, '', key=' '*16)
     ValueError : Invalid data, data length is not a multiple of 4, or less than 8.
     >>> try_catch(xxtea.decrypt, ' '*8, key=' '*16)
-    ValueError : Invalid data, illegal PKCS#7 padding. Could be using an wrong key.
+    ValueError : Invalid data, illegal PKCS#7 padding. Could be using a wrong key.
     >>> try_catch(xxtea.decrypt_hex, ' '*8, key=' '*16)
     TypeError : Non-hexadecimal digit found
     >>> try_catch(xxtea.decrypt_hex, 'abc', key=' '*16)
