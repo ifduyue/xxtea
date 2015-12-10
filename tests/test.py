@@ -51,12 +51,14 @@ class TestXXTEA(unittest.TestCase):
             self.assertEqual(binascii.b2a_hex(enc), hexenc)
 
     def test_decrypt_invalid(self):
-        with self.assertRaises(ValueError):
+        def f():
             for i in range(1024):
                 key = os.urandom(16)
                 data = os.urandom(i * 8)
 
-                xxtea.decrypt(data, key)
+                xxtea.decrypt(data, key=key)
+
+        self.assertRaises(ValueError, f)
 
 
 if __name__ == '__main__':
