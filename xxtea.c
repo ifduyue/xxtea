@@ -42,6 +42,8 @@
 #define PyString_AS_STRING PyBytes_AsString
 #endif
 
+#define XFREE(o) do { if ((o) == NULL) ; else free(o); } while (0)
+
 #define DELTA 0x9e3779b9
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
 
@@ -213,15 +215,8 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     return retval;
 
 cleanup:
-
-    if (d) {
-        free(d);
-    }
-
-    if (retval) {
-        Py_DECREF(retval);
-    }
-
+    XFREE(d);
+    Py_XDECREF(retval);
     return NULL;
 }
 
@@ -314,15 +309,8 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     return retval;
 
 cleanup:
-
-    if (d) {
-        free(d);
-    }
-
-    if (retval) {
-        Py_DECREF(retval);
-    }
-
+    XFREE(d);
+    Py_XDECREF(retval);
     return NULL;
 }
 
