@@ -107,3 +107,36 @@ Python 3:
     >>> hexenc = binascii.hexlify(xxtea.encrypt(s, key))
     >>> s == xxtea.decrypt(binascii.unhexlify(hexenc), key)
     True
+
+Catching Exceptions
+---------------------
+
+It is possible to throw an ``ValueError`` or a ``TypeError`` during calling
+``decrypt()`` and ``decrypt_hex()``. Better to catch them, or your program
+would exit.
+
+.. code-block:: python
+
+    >>> from __future__ import print_function
+    >>> import xxtea
+    >>> 
+    >>> def try_catch(func, *args, **kwargs):
+    ...     try:
+    ...         func(*args, **kwargs)
+    ...     except Exception as e:
+    ...         print(e.__class__.__name__, ':', e)
+    ...         
+    ...     
+    ... 
+    >>> try_catch(xxtea.decrypt, '', key='')
+    ValueError : Need a 16-byte key.
+    >>> try_catch(xxtea.decrypt, '', key=' '*16)
+    ValueError : Invalid data, data length is not a multiple of 4, or less than 8.
+    >>> try_catch(xxtea.decrypt, ' '*8, key=' '*16)
+    ValueError : Invalid data, illegal PKCS#7 padding. Could be using an wrong key.
+    >>> try_catch(xxtea.decrypt_hex, ' '*8, key=' '*16)
+    TypeError : Non-hexadecimal digit found
+    >>> try_catch(xxtea.decrypt_hex, 'abc', key=' '*16)
+    TypeError : Odd-length string
+    >>> try_catch(xxtea.decrypt_hex, 'abcd', key=' '*16)
+    ValueError : Invalid data, data length is not a multiple of 4, or less than 8.
