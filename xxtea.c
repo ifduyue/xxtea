@@ -186,7 +186,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     if (klen != 16) {
-        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
+        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
         return NULL;
     }
 
@@ -262,7 +262,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     if (klen != 16) {
-        PyErr_SetString(PyExc_TypeError, "Need a 16-byte key.");
+        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
         return NULL;
     }
 
@@ -276,7 +276,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 
     /* not divided by 4, or length < 8 */
     if (dlen & 3 || dlen < 8) {
-        PyErr_SetString(PyExc_TypeError, "Invalid data.");
+        PyErr_SetString(PyExc_ValueError, "Invalid data, data length is not a multiple of 4, or less than 8.");
         goto cleanup;
     }
 
@@ -300,7 +300,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
     else {
         /* Illegal PKCS#7 padding */
-        PyErr_SetString(PyExc_TypeError, "Invalid data.");
+        PyErr_SetString(PyExc_ValueError, "Invalid data, illegal PKCS#7 padding. Could be using an wrong key.");
         goto cleanup;
     }
 
