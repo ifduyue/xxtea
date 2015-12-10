@@ -141,7 +141,7 @@ static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
         s[4 * i + 3] = (in[i] >> 24) & 0xFF;
     }
 
-    i *= 4;
+    i <<= 2;
 
     /* PKCS#7 unpadding */
     if (padding) {
@@ -149,12 +149,13 @@ static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
         i -= pad;
     }
 
-    if (i >= 0) {
+    if (i >= 0 && i <= inlen << 2) {
         s[i] = '\0';
     }
 
     /* How many bytes we've got */
-    return i;
+    /* Negative means errors */
+    return pad < 0 ? pad : i;
 }
 
 /*****************************************************************************
