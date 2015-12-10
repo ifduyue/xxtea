@@ -147,7 +147,9 @@ static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
         i -= pad;
     }
 
-    s[i] = '\0';
+    if (i >= 0) {
+        s[i] = '\0';
+    }
 
     /* How many bytes we've got */
     return i;
@@ -296,9 +298,15 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     bytes2longs(key, klen, k, 0);
     btea(d, -alen, k);
 
-    if ((rc = longs2bytes(d, alen, retbuf, 1)) != dlen) {
+    rc = longs2bytes(d, alen, retbuf, 1);
+    if (rc >= 0) {
         /* Remove PKCS#7 padded chars */
         Py_SIZE(retval) = rc;
+    }
+    else {
+        /* Illegal PKCS#7 padding */
+        PyErr_SetString(PyExc_TypeError, "Invalid data.");
+        goto cleanup;
     }
 
     free(d);
