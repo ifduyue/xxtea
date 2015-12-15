@@ -36,7 +36,16 @@ class TestXXTEA(unittest.TestCase):
             dec = xxtea.decrypt(enc, key)
             self.assertEqual(data, dec)
 
+    def test_zero_bytes(self):
+        for i in range(2048):
             data = b'\0' * i
+
+            key = os.urandom(16)
+            enc = xxtea.encrypt(data, key)
+            dec = xxtea.decrypt(enc, key)
+            self.assertEqual(data, dec)
+
+            key = b'\0' * 16
             enc = xxtea.encrypt(data, key)
             dec = xxtea.decrypt(enc, key)
             self.assertEqual(data, dec)
