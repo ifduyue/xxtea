@@ -129,7 +129,7 @@ static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
 
 static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
 {
-    int i, pad = 0;
+    int i, outlen, pad;
     unsigned char *s;
 
     s = (unsigned char *)out;
@@ -141,21 +141,33 @@ static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
         s[4 * i + 3] = (in[i] >> 24) & 0xFF;
     }
 
-    i <<= 2;
+    outlen = inlen * 4;
 
     /* PKCS#7 unpadding */
     if (padding) {
-        pad = s[i - 1];
-        i -= pad;
+        pad = s[outlen - 1];
+        outlen -= pad;
+
+        if (pad < 1 || pad > 8) {
+            /* invalid padding */
+            return -1;
+        }
+
+        if (outlen < 0) {
+            return -2;
+        }
+
+        for (i = outlen; i < inlen * 4; i++) {
+            if (s[i] != pad) {
+                return -3;
+            }
+        }
     }
 
-    if (i >= 0 && i <= inlen << 2) {
-        s[i] = '\0';
-    }
+    s[outlen] = '\0';
 
     /* How many bytes we've got */
-    /* Negative means errors */
-    return pad < 0 ? pad : i;
+    return outlen;
 }
 
 /*****************************************************************************
