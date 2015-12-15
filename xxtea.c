@@ -129,7 +129,7 @@ static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
 
 static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
 {
-    int i, pad;
+    int i, pad = 0;
     unsigned char *s;
 
     s = (unsigned char *)out;
