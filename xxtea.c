@@ -210,9 +210,11 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         return PyErr_NoMemory();
     }
 
+    Py_BEGIN_ALLOW_THREADS
     bytes2longs(data, dlen, d, 1);
     bytes2longs(key, klen, k, 0);
     btea(d, alen, k);
+    Py_END_ALLOW_THREADS
 
     retval = PyString_FromStringAndSize(NULL, (alen << 2));
 
@@ -302,11 +304,13 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 
     }
 
+    Py_BEGIN_ALLOW_THREADS
     bytes2longs(data, dlen, d, 0);
     bytes2longs(key, klen, k, 0);
     btea(d, -alen, k);
-
     rc = longs2bytes(d, alen, retbuf, 1);
+    Py_END_ALLOW_THREADS
+
     if (rc >= 0) {
         /* Remove PKCS#7 padded chars */
         Py_SIZE(retval) = rc;
