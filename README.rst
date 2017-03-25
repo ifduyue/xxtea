@@ -4,6 +4,10 @@ xxtea |travis-badge| |pypi-badge|
 .. |travis-badge| image:: https://travis-ci.org/ifduyue/xxtea.png
     :target: https://travis-ci.org/ifduyue/xxtea
 
+.. image:: https://ci.appveyor.com/api/projects/status/mitcnsayvbr10gt4?svg=true
+    :target: https://ci.appveyor.com/project/duyue/xxtea
+    :alt: Appveyor Build Status
+
 .. |pypi-badge| image:: https://badge.fury.io/py/xxtea.svg
     :target: http://badge.fury.io/py/xxtea
 

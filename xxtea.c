@@ -26,7 +26,6 @@
 
 
 #include <Python.h>
-#include <stdint.h>
 #include <ctype.h>
 #include <stdio.h>
 
@@ -53,9 +52,9 @@ static PyObject *_xxtea_pyunicode_unhexlify;
 static PyObject *_xxtea_pyunicode_decrypt;
 
 
-static void btea(uint32_t *v, int n, uint32_t const key[4])
+static void btea(unsigned int *v, int n, unsigned int const key[4])
 {
-    uint32_t y, z, sum;
+    unsigned int y, z, sum;
     unsigned p, rounds, e;
 
     if (n > 1) {          /* Coding Part */
@@ -99,7 +98,7 @@ static void btea(uint32_t *v, int n, uint32_t const key[4])
     }
 }
 
-static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
+static int bytes2longs(const char *in, int inlen, unsigned int *out, int padding)
 {
     int i, pad;
     const unsigned char *s;
@@ -127,7 +126,7 @@ static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
     return ((i - 1) >> 2) + 1;
 }
 
-static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
+static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
 {
     int i, outlen, pad;
     unsigned char *s;
@@ -188,7 +187,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     int alen, dlen, klen;
     PyObject *retval;
     char *retbuf;
-    uint32_t *d, k[4];
+    unsigned int *d, k[4];
 
     d = NULL;
     retval = NULL;
@@ -204,7 +203,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     alen = dlen < 4 ? 2 : (dlen >> 2) + 1;
-    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
+    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
 
     if (d == NULL) {
         return PyErr_NoMemory();
@@ -266,7 +265,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     int alen, dlen, klen, rc;
     PyObject *retval;
     char *retbuf;
-    uint32_t *d, k[4];
+    unsigned int *d, k[4];
 
     d = NULL;
     retval = NULL;
@@ -296,7 +295,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     alen = dlen / 4;
-    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
+    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
 
     if (d == NULL) {
         PyErr_NoMemory();
