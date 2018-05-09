@@ -8,7 +8,6 @@ python:
   - 3.5
   - 3.6
   - 3.7-dev
-  - 3.8-dev
   - nightly
   - pypy
 install:
@@ -18,4 +17,3 @@ after_success: bash bench.sh
 matrix:
   allow_failures:
     - python: nightly
-    - python: *-dev
