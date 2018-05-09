@@ -36,18 +36,58 @@ class TestXXTEA(unittest.TestCase):
             dec = xxtea.decrypt(enc, key)
             self.assertEqual(data, dec)
 
+            for padding in (True, False):
+                enc = xxtea.encrypt(data, key, padding)
+                dec = xxtea.decrypt(enc, key, padding)
+                self.assertEqual(data, dec, padding)
+
     def test_zero_bytes(self):
         for i in range(2048):
             data = b'\0' * i
 
+
             key = os.urandom(16)
-            enc = xxtea.encrypt(data, key)
-            dec = xxtea.decrypt(enc, key)
-            self.assertEqual(data, dec)
+            for padding in (True, False):
+                enc = xxtea.encrypt(data, key, padding)
+                dec = xxtea.decrypt(enc, key, padding)
+                self.assertEqual(data, dec)
 
             key = b'\0' * 16
-            enc = xxtea.encrypt(data, key)
-            dec = xxtea.decrypt(enc, key)
+            for padding in (True, False):
+                enc = xxtea.encrypt(data, key, padding)
+                dec = xxtea.decrypt(enc, key, padding)
+                self.assertEqual(data, dec)
+
+    def test_encrypt_nopadding(self):
+        key = os.urandom(16)
+        for i in (8, 12, 16, 20):
+            data = os.urandom(i)
+            enc = xxtea.encrypt(data, key, padding=False)
+            dec = xxtea.decrypt(enc, key, padding=False)
+            self.assertEqual(data, dec)
+
+    def test_encrypt_hex_nopadding(self):
+        key = os.urandom(16)
+        for i in (8, 12, 16, 20):
+            data = os.urandom(i)
+            enc = xxtea.encrypt_hex(data, key, padding=False)
+            dec = xxtea.decrypt_hex(enc, key, padding=False)
+            self.assertEqual(data, dec)
+
+    def test_encrypt_nopadding_zero(self):
+        key = os.urandom(16)
+        for i in (8, 12, 16, 20):
+            data = b'\0' * i
+            enc = xxtea.encrypt(data, key, padding=False)
+            dec = xxtea.decrypt(enc, key, padding=False)
+            self.assertEqual(data, dec)
+
+    def test_encrypt_hex_nopadding_zero(self):
+        key = os.urandom(16)
+        for i in (8, 12, 16, 20):
+            data = b'\0' * i
+            enc = xxtea.encrypt_hex(data, key, padding=False)
+            dec = xxtea.decrypt_hex(enc, key, padding=False)
             self.assertEqual(data, dec)
 
     def test_hex_encode(self):
@@ -60,14 +100,30 @@ class TestXXTEA(unittest.TestCase):
             self.assertEqual(binascii.b2a_hex(enc), hexenc)
 
     def test_decrypt_invalid(self):
-        def f():
+        def f1():
             for i in range(1024):
                 key = os.urandom(16)
                 data = os.urandom(i * 8)
 
                 xxtea.decrypt(data, key=key)
 
-        self.assertRaises(ValueError, f)
+        def f2():
+            for i in range(1024):
+                key = os.urandom(16)
+                data = os.urandom(i * 8)
+
+                xxtea.decrypt(data, key=key, padding=True)
+
+        def f1():
+            for i in range(1024):
+                key = os.urandom(16)
+                data = os.urandom(i * 8)
+
+                xxtea.decrypt(data, key=key, padding=False)
+
+        self.assertRaises(ValueError, f1)
+        self.assertRaises(ValueError, f2)
+        self.assertRaises(ValueError, f3)
 
 
 if __name__ == '__main__':

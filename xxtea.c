@@ -173,18 +173,18 @@ static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
  * Module Functions ***********************************************************
  ****************************************************************************/
 
-static char *keywords[] = {"data", "key", NULL};
+static char *keywords[] = {"data", "key", "padding", NULL};
 
 
 PyDoc_STRVAR(
     xxtea_encrypt_doc,
-    "encrypt (data, key)\n\n"
+    "encrypt (data, key, padding=True)\n\n"
     "Encrypt `data` with a 16-byte `key`, return binary bytes.");
 
 static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *data, *key;
-    int alen, dlen, klen;
+    int alen, dlen, klen, padding;
     PyObject *retval;
     char *retbuf;
     unsigned int *d, k[4];
@@ -192,13 +192,19 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     d = NULL;
     retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
+    padding = 1;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &padding)) {
         return NULL;
     }
 
     if (klen != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
+        return NULL;
+    }
+
+    if (!padding && (dlen < 8 || dlen & 3 != 0)) {
+        PyErr_SetString(PyExc_ValueError, "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
         return NULL;
     }
 
@@ -210,9 +216,10 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     Py_BEGIN_ALLOW_THREADS
-    bytes2longs(data, dlen, d, 1);
+    bytes2longs(data, dlen, d, padding);
     bytes2longs(key, klen, k, 0);
     btea(d, alen, k);
+
     Py_END_ALLOW_THREADS
 
     retval = PyString_FromStringAndSize(NULL, (alen << 2));
@@ -236,7 +243,7 @@ cleanup:
 
 PyDoc_STRVAR(
     xxtea_encrypt_hex_doc,
-    "encrypt_hex (data, key)\n\n"
+    "encrypt_hex (data, key, padding=True)\n\n"
     "Encrypt `data` with a 16-byte `key`, return hex encoded bytes.");
 
 static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -256,13 +263,13 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
 
 PyDoc_STRVAR(
     xxtea_decrypt_doc,
-    "decrypt (data, key)\n\n"
+    "decrypt (data, key, padding=True)\n\n"
     "Decrypt `data` with a 16-byte `key`, return original bytes.");
 
 static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     const char *data, *key;
-    int alen, dlen, klen, rc;
+    int alen, dlen, klen, rc, padding;
     PyObject *retval;
     char *retbuf;
     unsigned int *d, k[4];
@@ -270,13 +277,19 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     d = NULL;
     retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
+    padding = 1;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#", keywords, &data, &dlen, &key, &klen)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &padding)) {
         return NULL;
     }
 
     if (klen != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
+        return NULL;
+    }
+
+    if (!padding && (dlen < 8 || dlen & 3)) {
+        PyErr_SetString(PyExc_ValueError, "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
         return NULL;
     }
 
@@ -307,17 +320,19 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     bytes2longs(data, dlen, d, 0);
     bytes2longs(key, klen, k, 0);
     btea(d, -alen, k);
-    rc = longs2bytes(d, alen, retbuf, 1);
+    rc = longs2bytes(d, alen, retbuf, padding);
     Py_END_ALLOW_THREADS
 
-    if (rc >= 0) {
-        /* Remove PKCS#7 padded chars */
-        Py_SIZE(retval) = rc;
-    }
-    else {
-        /* Illegal PKCS#7 padding */
-        PyErr_SetString(PyExc_ValueError, "Invalid data, illegal PKCS#7 padding. Could be using a wrong key.");
-        goto cleanup;
+    if (padding) {
+        if (rc >= 0) {
+            /* Remove PKCS#7 padded chars */
+            Py_SIZE(retval) = rc;
+        }
+        else {
+            /* Illegal PKCS#7 padding */
+            PyErr_SetString(PyExc_ValueError, "Invalid data, illegal PKCS#7 padding. Could be using a wrong key.");
+            goto cleanup;
+        }
     }
 
     free(d);
@@ -332,15 +347,17 @@ cleanup:
 
 PyDoc_STRVAR(
     xxtea_decrypt_hex_doc,
-    "decrypt_hex (data, key)\n\n"
+    "decrypt_hex (data, key, padding = True)\n\n"
     "Decrypt hex encoded `data` with a 16-byte `key`, return original bytes.");
 
 static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    PyObject *data, *key, *retval, *tmp;
-    data = key = retval = tmp = NULL;
+    PyObject *data, *key, *padding, *retval, *tmp;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "SS", keywords, &data, &key)) {
+    data = key = retval = tmp = NULL;
+    padding = Py_BuildValue("i", 1);
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "SS|O", keywords, &data, &key, &padding)) {
         return NULL;
     }
 
@@ -348,7 +365,7 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
         return NULL;
     }
 
-    retval = PyObject_CallMethodObjArgs(module, _xxtea_pyunicode_decrypt, tmp, key, NULL);
+    retval = PyObject_CallMethodObjArgs(module, _xxtea_pyunicode_decrypt, tmp, key, padding, NULL);
     Py_DECREF(tmp);
 
     return retval;
