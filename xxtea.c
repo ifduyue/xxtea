@@ -197,6 +197,8 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &padding)) {
         return NULL;
     }
+    padding = padding != 0 ? 1 : 0;
+
 
     if (klen != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
@@ -208,7 +210,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    alen = dlen < 4 ? 2 : (dlen >> 2) + 1;
+    alen = dlen < 4 ? 2 : (dlen >> 2) + padding;
     d = (unsigned int *)calloc(alen, sizeof(unsigned int));
 
     if (d == NULL) {
@@ -282,6 +284,8 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &padding)) {
         return NULL;
     }
+    padding = padding != 0 ? 1 : 0;
+
 
     if (klen != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
@@ -436,3 +440,4 @@ void initxxtea(void)
     return module;
 #endif
 }
+
