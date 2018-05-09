@@ -157,7 +157,7 @@ Catching Exceptions
 
 It is possible to throw a ``ValueError`` or a ``TypeError`` during calling
 ``decrypt()`` and ``decrypt_hex()``. Better to catch them, or your program
-would exit.
+will exit.
 
 .. code-block:: python
 
