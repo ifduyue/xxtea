@@ -121,6 +121,37 @@ Python 3:
     >>> s == xxtea.decrypt(binascii.unhexlify(hexenc), key)
     True
 
+Padding
+---------
+
+Padding is enabled by default, in this case you can encode any bytes of any length.
+
+.. code-block:: python
+
+    >>> xxtea.encrypt_hex('', key)
+    'd63256eb59134f1f'
+    >>> xxtea.decrypt_hex(_, key)
+    ''
+    >>> xxtea.encrypt_hex(' ', key)
+    '97009bd24074a7a5'
+    >>> xxtea.decrypt_hex(_, key)
+    ' '
+
+You can disable padding by setting padding parameter to ``False``.
+In this case data will not be padded, so data length must be a multiple of 4 bytes and must not be less than 8 bytes.
+Otherwise ``ValueError`` will be raised.
+
+.. code-block:: python
+
+    >>> xxtea.encrypt_hex('', key, padding=False)
+    ValueError: Data length must be a multiple of 4 bytes and must not be less than 8 bytes
+    >>> xxtea.encrypt_hex('xxtea is good', key, padding=False)
+    ValueError: Data length must be a multiple of 4 bytes and must not be less than 8 bytes
+    >>> xxtea.encrypt_hex('12345678', key, padding=False)
+    '64f4e969ba90d386'
+    >>> xxtea.decrypt_hex(_, key, padding=False)
+    '12345678'
+
 Catching Exceptions
 ---------------------
 
