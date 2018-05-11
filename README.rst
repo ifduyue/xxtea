@@ -225,6 +225,7 @@ v0.2.0 2015/02/28
 ~~~~~~~~~~~~~~~~~~~~
 
 This release is _NOT_ compatible with previous versions.
+
 - [NEW] Added PKCS#7 Padding.
 - [NEW] Added `encrypt_hex()` and `decrypt_hex()`.
 - [CHANGE] Removed `xxtea.RESULT_TYPE_HEX`, `xxtea.RESULT_TYPE_RAW`, and
