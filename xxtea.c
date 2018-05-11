@@ -173,7 +173,7 @@ static inline int longs2bytes(unsigned int *in, int inlen, char *out, int paddin
  * Module Functions ***********************************************************
  ****************************************************************************/
 
-static char *keywords[] = {"data", "key", "padding", NULL};
+static char *keywords[] = {"data", "key", "padding", "rounds", NULL};
 
 
 PyDoc_STRVAR(
