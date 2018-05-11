@@ -365,17 +365,22 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     rounds = Py_BuildValue("I", 0);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "SS|OO", keywords, &data, &key, &padding, &rounds)) {
-        return NULL;
+        goto cleanup;
     }
 
     if (!(tmp = PyObject_CallMethodObjArgs(binascii, _xxtea_pyunicode_unhexlify, data, NULL))) {
-        return NULL;
+        goto cleanup;
     }
 
     retval = PyObject_CallMethodObjArgs(module, _xxtea_pyunicode_decrypt, tmp, key, padding, rounds, NULL);
     Py_DECREF(tmp);
 
     return retval;
+
+cleanup:
+    Py_DECREF(padding);
+    Py_DECREF(rounds);
+    return NULL;
 }
 
 /*****************************************************************************
