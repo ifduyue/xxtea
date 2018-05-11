@@ -358,12 +358,13 @@ PyDoc_STRVAR(
 
 static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    PyObject *data, *key, *padding, *retval, *tmp;
+    PyObject *data, *key, *padding, *rounds, *retval, *tmp;
 
     data = key = retval = tmp = NULL;
     padding = Py_BuildValue("i", 1);
+    rounds = Py_BuildValue("I", 0);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "SS|O", keywords, &data, &key, &padding)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "SS|OO", keywords, &data, &key, &padding, &rounds)) {
         return NULL;
     }
 
@@ -371,7 +372,7 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
         return NULL;
     }
 
-    retval = PyObject_CallMethodObjArgs(module, _xxtea_pyunicode_decrypt, tmp, key, padding, NULL);
+    retval = PyObject_CallMethodObjArgs(module, _xxtea_pyunicode_decrypt, tmp, key, padding, rounds, NULL);
     Py_DECREF(tmp);
 
     return retval;
