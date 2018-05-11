@@ -52,13 +52,13 @@ static PyObject *_xxtea_pyunicode_unhexlify;
 static PyObject *_xxtea_pyunicode_decrypt;
 
 
-static inline void btea(unsigned int *v, int n, unsigned int const key[4])
+static inline void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int rounds)
 {
     unsigned int y, z, sum;
-    unsigned p, rounds, e;
+    unsigned p, e;
 
     if (n > 1) {          /* Coding Part */
-        rounds = 6 + 52 / n;
+        rounds = rounds == 0 ? 6 + 52 / n: rounds;
         sum = 0;
         z = v[n - 1];
 
@@ -78,7 +78,7 @@ static inline void btea(unsigned int *v, int n, unsigned int const key[4])
     }
     else if (n < -1) {    /* Decoding Part */
         n = -n;
-        rounds = 6 + 52 / n;
+        rounds = rounds == 0 ? 6 + 52 / n: rounds;
         sum = rounds * DELTA;
         y = v[0];
 
@@ -178,7 +178,7 @@ static char *keywords[] = {"data", "key", "padding", NULL};
 
 PyDoc_STRVAR(
     xxtea_encrypt_doc,
-    "encrypt (data, key, padding=True)\n\n"
+    "encrypt (data, key, padding=True, rounds=0)\n\n"
     "Encrypt `data` with a 16-byte `key`, return binary bytes.");
 
 static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -187,14 +187,15 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     int alen, dlen, klen, padding;
     PyObject *retval;
     char *retbuf;
-    unsigned int *d, k[4];
+    unsigned int *d, k[4], rounds;
 
     d = NULL;
     retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
     padding = 1;
+    rounds = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &padding)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|iI", keywords, &data, &dlen, &key, &klen, &padding, &rounds)) {
         return NULL;
     }
     padding = padding != 0 ? 1 : 0;
@@ -220,7 +221,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     Py_BEGIN_ALLOW_THREADS
     bytes2longs(data, dlen, d, padding);
     bytes2longs(key, klen, k, 0);
-    btea(d, alen, k);
+    btea(d, alen, k, rounds);
 
     Py_END_ALLOW_THREADS
 
@@ -245,7 +246,7 @@ cleanup:
 
 PyDoc_STRVAR(
     xxtea_encrypt_hex_doc,
-    "encrypt_hex (data, key, padding=True)\n\n"
+    "encrypt_hex (data, key, padding=True, rounds=0)\n\n"
     "Encrypt `data` with a 16-byte `key`, return hex encoded bytes.");
 
 static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -265,7 +266,7 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
 
 PyDoc_STRVAR(
     xxtea_decrypt_doc,
-    "decrypt (data, key, padding=True)\n\n"
+    "decrypt (data, key, padding=True, rounds=0)\n\n"
     "Decrypt `data` with a 16-byte `key`, return original bytes.");
 
 static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -274,14 +275,15 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     int alen, dlen, klen, rc, padding;
     PyObject *retval;
     char *retbuf;
-    unsigned int *d, k[4];
+    unsigned int *d, k[4], rounds;
 
     d = NULL;
     retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
     padding = 1;
+    rounds = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|i", keywords, &data, &dlen, &key, &klen, &padding)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|iI", keywords, &data, &dlen, &key, &klen, &padding, &rounds)) {
         return NULL;
     }
     padding = padding != 0 ? 1 : 0;
@@ -323,7 +325,7 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     Py_BEGIN_ALLOW_THREADS
     bytes2longs(data, dlen, d, 0);
     bytes2longs(key, klen, k, 0);
-    btea(d, -alen, k);
+    btea(d, -alen, k, rounds);
     rc = longs2bytes(d, alen, retbuf, padding);
     Py_END_ALLOW_THREADS
 
