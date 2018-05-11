@@ -206,7 +206,7 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    if (!padding && (dlen < 8 || dlen & 3 != 0)) {
+    if (!padding && (dlen < 8 || (dlen & 3) != 0)) {
         PyErr_SetString(PyExc_ValueError, "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
         return NULL;
     }
