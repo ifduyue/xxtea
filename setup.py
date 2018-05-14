@@ -30,7 +30,7 @@ setup(
     author='Yue Du',
     author_email='ifduyue@gmail.com',
     url='https://github.com/ifduyue/xxtea',
-    description="xxtea",
+    description="xxtea is a simple block cipher",
     long_description=open('README.rst').read(),
     license="BSD",
     keywords="xxtea",
