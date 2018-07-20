@@ -101,6 +101,8 @@ Python 3:
     True
     >>> 
     >>> binascii.hexlify(enc) == hexenc
+    True
+
 
 ``encrypt_hex()`` and ``decrypt_hex()`` operate on ciphertext in a hexadecimal
 representation. They are exactly equivalent to:
