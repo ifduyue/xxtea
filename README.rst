@@ -199,7 +199,7 @@ v1.1.0 2018/02/03
 ~~~~~~~~~~~~~~~~~~~
 
 - Test on appveyor
-- Use ``unsigned int`` instead of ``uint32_ti``
+- Use ``unsigned int`` instead of ``uint32_t``
 
 v1.0.2 2015/12/15
 ~~~~~~~~~~~~~~~~~~~
