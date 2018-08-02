@@ -18,13 +18,14 @@ environment:
 build: off
 
 install:
+    - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
     - git --version
     - python --version
-    - $PYTHON\bin\python.exe -m pip install --disable-pip-version-check --user --upgrade pip
-    - pip install --upgrade wheel setuptools
     - pip --version
+    - pip install --user --upgrade wheel setuptools
 
 test_script:
+    - python setup.py build
     - python setup.py test
 
 after_test:

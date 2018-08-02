@@ -51,8 +51,7 @@ static PyObject *_xxtea_pyunicode_hexlify;
 static PyObject *_xxtea_pyunicode_unhexlify;
 static PyObject *_xxtea_pyunicode_decrypt;
 
-
-inline static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int rounds)
+static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int rounds)
 {
     unsigned int y, z, sum;
     unsigned p, e;
@@ -98,7 +97,7 @@ inline static void btea(unsigned int *v, int n, unsigned int const key[4], unsig
     }
 }
 
-static int inline bytes2longs(const char *in, int inlen, unsigned int *out, int padding)
+static int bytes2longs(const char *in, int inlen, unsigned int *out, int padding)
 {
     int i, pad;
     const unsigned char *s;
@@ -126,7 +125,7 @@ static int inline bytes2longs(const char *in, int inlen, unsigned int *out, int 
     return ((i - 1) >> 2) + 1;
 }
 
-inline static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
+static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
 {
     int i, outlen, pad;
     unsigned char *s;
