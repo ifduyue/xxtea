@@ -221,7 +221,6 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     bytes2longs(data, dlen, d, padding);
     bytes2longs(key, klen, k, 0);
     btea(d, alen, k, rounds);
-
     Py_END_ALLOW_THREADS
 
     retval = PyString_FromStringAndSize(NULL, (alen << 2));
