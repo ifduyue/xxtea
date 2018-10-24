@@ -227,7 +227,7 @@ will exit.
 CHANGELOG
 --------------
 
-v1.2.1 2018/10/24
+v1.3.0 2018/10/24
 ~~~~~~~~~~~~~~~~~~~
 
 - Fixed a memory leak in decrypt_hex
