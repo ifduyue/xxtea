@@ -60,21 +60,21 @@ Python 2:
 
     >>> import os
     >>> import xxtea
-    >>> 
+    >>>
     >>> key = os.urandom(16)  # Key must be a 16-byte string.
     >>> s = "xxtea is good"
-    >>> 
+    >>>
     >>> enc = xxtea.encrypt(s, key)
     >>> dec = xxtea.decrypt(enc, key)
     >>> s == dec
     True
-    >>> 
+    >>>
     >>> hexenc = xxtea.encrypt_hex(s, key)
     >>> hexenc
     'd1d8e82461dd5828397c32ad265ee225'
     >>> s == xxtea.decrypt_hex(hexenc, key)
     True
-    >>> 
+    >>>
     >>> enc.encode('hex') == hexenc
     True
 
@@ -85,21 +85,21 @@ Python 3:
     >>> import os
     >>> import xxtea
     >>> import binascii
-    >>> 
+    >>>
     >>> key = os.urandom(16)  # Key must be a 16-byte string.
     >>> s = b"xxtea is good"
-    >>> 
+    >>>
     >>> enc = xxtea.encrypt(s, key)
     >>> dec = xxtea.decrypt(enc, key)
     >>> s == dec
     True
-    >>> 
+    >>>
     >>> hexenc = xxtea.encrypt_hex(s, key)
     >>> hexenc
     b'7ad85672d770fb5cf636c49d57e732ae'
     >>> s == xxtea.decrypt_hex(hexenc, key)
     True
-    >>> 
+    >>>
     >>> binascii.hexlify(enc) == hexenc
     True
 
@@ -202,15 +202,15 @@ will exit.
 
     >>> from __future__ import print_function
     >>> import xxtea
-    >>> 
+    >>>
     >>> def try_catch(func, *args, **kwargs):
     ...     try:
     ...         func(*args, **kwargs)
     ...     except Exception as e:
     ...         print(e.__class__.__name__, ':', e)
-    ...         
-    ...     
-    ... 
+    ...
+    ...
+    ...
     >>> try_catch(xxtea.decrypt, '', key='')
     ValueError : Need a 16-byte key.
     >>> try_catch(xxtea.decrypt, '', key=' '*16)
