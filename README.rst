@@ -154,6 +154,43 @@ Otherwise ``ValueError`` will be raised.
     >>> xxtea.decrypt_hex(_, key, padding=False)
     '12345678'
 
+Rounds
+----------
+
+By default xxtea manipulates the input data for ``6 + 52 / n`` rounds,
+where n denotes how many 32-bit integers data can fit in.
+We can specify it manually by setting ``rounds`` parameter.
+
+Python2:
+
+.. code-block:: python
+
+    >>> import xxtea
+    >>> import string
+    >>> data = string.digits
+    >>> key = string.ascii_letters[:16]
+    >>> xxtea.encrypt_hex(data, key)
+    '5b80b08a5d1923e4cd992dd5'
+    >>> xxtea.encrypt_hex(data, key, rounds=23)
+    '5b80b08a5d1923e4cd992dd5'
+    >>> xxtea.encrypt_hex(data, key, rounds=1024)
+    '1577bbf28c43ced93bd50720'
+
+Python3:
+
+.. code-block:: python
+
+    >>> import xxtea
+    >>> import string
+    >>> data = string.digits
+    >>> key = string.ascii_letters[:16]
+    >>> xxtea.encrypt_hex(data, key)
+    b'5b80b08a5d1923e4cd992dd5'
+    >>> xxtea.encrypt_hex(data, key, rounds=23)
+    b'5b80b08a5d1923e4cd992dd5'
+    >>> xxtea.encrypt_hex(data, key, rounds=1024)
+    b'1577bbf28c43ced93bd50720'
+
 Catching Exceptions
 ---------------------
 
