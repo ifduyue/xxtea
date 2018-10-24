@@ -190,6 +190,12 @@ will exit.
 CHANGELOG
 --------------
 
+v1.2.1 2018/10/24
+~~~~~~~~~~~~~~~~~~~
+
+- Fixed a memory leak in decrypt_hex
+- Deployed wheels automatically
+
 v1.2.0 2018/05/09
 ~~~~~~~~~~~~~~~~~~~
 
