@@ -158,8 +158,8 @@ Rounds
 ----------
 
 By default xxtea manipulates the input data for ``6 + 52 / n`` rounds,
-where n denotes how many 32-bit integers data can fit in.
-We can specify it manually by setting ``rounds`` parameter.
+where n denotes how many 32-bit integers the input data can fit in.
+We can change this by setting ``rounds`` parameter.
 
 Python2:
 
