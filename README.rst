@@ -194,9 +194,8 @@ Python3:
 Catching Exceptions
 ---------------------
 
-It is possible to throw a ``ValueError`` or a ``TypeError`` during calling
-``decrypt()`` and ``decrypt_hex()``. Better to catch them, or your program
-will exit.
+When calling ``decrypt()`` and ``decrypt_hex()``, it is possible that a ``ValueError`` or a ``TypeError``
+was raised. Better to catch them, or your program will exit.
 
 .. code-block:: python
 
