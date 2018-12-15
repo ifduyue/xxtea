@@ -54,32 +54,6 @@ Usage
 This module provides four functions: ``encrypt()``, ``decrypt()``,
 ``encrypt_hex()``, and ``decrypt_hex()``.
 
-Python 2:
-
-.. code-block:: python
-
-    >>> import os
-    >>> import xxtea
-    >>>
-    >>> key = os.urandom(16)  # Key must be a 16-byte string.
-    >>> s = "xxtea is good"
-    >>>
-    >>> enc = xxtea.encrypt(s, key)
-    >>> dec = xxtea.decrypt(enc, key)
-    >>> s == dec
-    True
-    >>>
-    >>> hexenc = xxtea.encrypt_hex(s, key)
-    >>> hexenc
-    'd1d8e82461dd5828397c32ad265ee225'
-    >>> s == xxtea.decrypt_hex(hexenc, key)
-    True
-    >>>
-    >>> enc.encode('hex') == hexenc
-    True
-
-Python 3:
-
 .. code-block:: Python
 
     >>> import os
@@ -107,21 +81,12 @@ Python 3:
 ``encrypt_hex()`` and ``decrypt_hex()`` operate on ciphertext in a hexadecimal
 representation. They are exactly equivalent to:
 
-Python 2:
-
-.. code-block:: python
-
-    >>> hexenc = xxtea.encrypt(s, key).encode('hex')
-    >>> s == xxtea.decrypt(hexenc.decode('hex'), key)
-    True
-
-Python 3:
-
 .. code-block:: python
 
     >>> hexenc = binascii.hexlify(xxtea.encrypt(s, key))
     >>> s == xxtea.decrypt(binascii.unhexlify(hexenc), key)
     True
+
 
 Padding
 ---------
@@ -131,17 +96,17 @@ Padding is enabled by default, in this case you can encode any bytes of any leng
 .. code-block:: python
 
     >>> xxtea.encrypt_hex('', key)
-    'd63256eb59134f1f'
+    b'd63256eb59134f1f'
     >>> xxtea.decrypt_hex(_, key)
-    ''
+    b''
     >>> xxtea.encrypt_hex(' ', key)
-    '97009bd24074a7a5'
+    b'97009bd24074a7a5'
     >>> xxtea.decrypt_hex(_, key)
-    ' '
+    b' '
 
 You can disable padding by setting padding parameter to ``False``.
 In this case data will not be padded, so data length must be a multiple of 4 bytes and must not be less than 8 bytes.
-Otherwise ``ValueError`` will be raised.
+Otherwise ``ValueError`` will be raised:
 
 .. code-block:: python
 
@@ -150,9 +115,10 @@ Otherwise ``ValueError`` will be raised.
     >>> xxtea.encrypt_hex('xxtea is good', key, padding=False)
     ValueError: Data length must be a multiple of 4 bytes and must not be less than 8 bytes
     >>> xxtea.encrypt_hex('12345678', key, padding=False)
-    '64f4e969ba90d386'
+    b'64f4e969ba90d386'
     >>> xxtea.decrypt_hex(_, key, padding=False)
-    '12345678'
+    b'12345678'
+
 
 Rounds
 ----------
@@ -162,23 +128,6 @@ where n denotes how many 32-bit integers the input data can fit in.
 We can change this by setting ``rounds`` parameter.
 
 Do note that the more rounds it is, the more time will be consumed.
-
-Python2:
-
-.. code-block:: python
-
-    >>> import xxtea
-    >>> import string
-    >>> data = string.digits
-    >>> key = string.ascii_letters[:16]
-    >>> xxtea.encrypt_hex(data, key)
-    '5b80b08a5d1923e4cd992dd5'
-    >>> xxtea.encrypt_hex(data, key, rounds=23)
-    '5b80b08a5d1923e4cd992dd5'
-    >>> xxtea.encrypt_hex(data, key, rounds=1024)
-    '1577bbf28c43ced93bd50720'
-
-Python3:
 
 .. code-block:: python
 
@@ -192,6 +141,7 @@ Python3:
     b'5b80b08a5d1923e4cd992dd5'
     >>> xxtea.encrypt_hex(data, key, rounds=1024)
     b'1577bbf28c43ced93bd50720'
+
 
 Catching Exceptions
 ---------------------
