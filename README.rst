@@ -137,7 +137,7 @@ Do note that the more rounds it is, the more time will be consumed.
     >>> key = string.ascii_letters[:16]
     >>> xxtea.encrypt_hex(data, key)
     b'5b80b08a5d1923e4cd992dd5'
-    >>> 6 + 52 // ((len(data) + (4 - 1)) // 4)
+    >>> 6 + 52 // ((len(data) + (4 - 1)) // 4)  # 4 means 4 bytes, size of a 32-bit integer
     23
     >>> xxtea.encrypt_hex(data, key, rounds=23)
     b'5b80b08a5d1923e4cd992dd5'
