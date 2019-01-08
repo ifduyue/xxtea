@@ -6,14 +6,8 @@ environment:
     PYPI_PASSWORD:
       secure: fFfFN5N5920gtX3+pwrOddk/psDk3wK67snCOt209bc=
   matrix:
-    - PYTHON: "C:\\Python26"
-    - PYTHON: "C:\\Python26-x64"
     - PYTHON: "C:\\Python27"
     - PYTHON: "C:\\Python27-x64"
-    - PYTHON: "C:\\Python32"
-    - PYTHON: "C:\\Python32-x64"
-    - PYTHON: "C:\\Python33"
-    - PYTHON: "C:\\Python33-x64"
     - PYTHON: "C:\\Python34"
     - PYTHON: "C:\\Python34-x64"
     - PYTHON: "C:\\Python35"
