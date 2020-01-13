@@ -182,46 +182,53 @@ PyDoc_STRVAR(
 
 static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    const char *data, *key;
     int alen, dlen, klen, padding;
     PyObject *retval;
     char *retbuf;
     unsigned int *d, k[4], rounds;
+    Py_buffer data, key;
 
     d = NULL;
     retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
     padding = 1;
     rounds = 0;
+    data.buf = data.obj = key.buf = key.obj = NULL;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|iI", keywords, &data, &dlen, &key, &klen, &padding, &rounds)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s*s*|iI", keywords, &data, &key, &padding, &rounds)) {
         return NULL;
     }
     padding = padding != 0 ? 1 : 0;
+    dlen = data.len;
+    klen = key.len;
 
 
     if (klen != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        return NULL;
+        goto cleanup;
     }
 
     if (!padding && (dlen < 8 || (dlen & 3) != 0)) {
         PyErr_SetString(PyExc_ValueError, "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
-        return NULL;
+        goto cleanup;
     }
 
     alen = dlen < 4 ? 2 : (dlen >> 2) + padding;
     d = (unsigned int *)calloc(alen, sizeof(unsigned int));
 
     if (d == NULL) {
-        return PyErr_NoMemory();
+        PyErr_NoMemory();
+        goto cleanup;
     }
 
     Py_BEGIN_ALLOW_THREADS
-    bytes2longs(data, dlen, d, padding);
-    bytes2longs(key, klen, k, 0);
+    bytes2longs(data.buf, dlen, d, padding);
+    bytes2longs(key.buf, klen, k, 0);
     btea(d, alen, k, rounds);
     Py_END_ALLOW_THREADS
+
+    PyBuffer_Release(&data);
+    PyBuffer_Release(&key);
 
     retval = PyString_FromStringAndSize(NULL, (alen << 2));
 
@@ -239,6 +246,8 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 cleanup:
     XFREE(d);
     Py_XDECREF(retval);
+    PyBuffer_Release(&data);
+    PyBuffer_Release(&key);
     return NULL;
 }
 
@@ -269,38 +278,41 @@ PyDoc_STRVAR(
 
 static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-    const char *data, *key;
     int alen, dlen, klen, rc, padding;
     PyObject *retval;
     char *retbuf;
     unsigned int *d, k[4], rounds;
+    Py_buffer data, key;
 
     d = NULL;
     retval = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
     padding = 1;
     rounds = 0;
+    data.buf = data.obj = key.buf = key.obj = NULL;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s#|iI", keywords, &data, &dlen, &key, &klen, &padding, &rounds)) {
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s*s*|iI", keywords, &data, &key, &padding, &rounds)) {
         return NULL;
     }
     padding = padding != 0 ? 1 : 0;
+    dlen = data.len;
+    klen = key.len;
 
 
     if (klen != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        return NULL;
+        goto cleanup;
     }
 
     if (!padding && (dlen < 8 || dlen & 3)) {
         PyErr_SetString(PyExc_ValueError, "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
-        return NULL;
+        goto cleanup;
     }
 
     retval = PyString_FromStringAndSize(NULL, dlen);
 
     if (!retval) {
-        return NULL;
+        goto cleanup;
     }
 
     retbuf = PyString_AS_STRING(retval);
@@ -321,11 +333,14 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     Py_BEGIN_ALLOW_THREADS
-    bytes2longs(data, dlen, d, 0);
-    bytes2longs(key, klen, k, 0);
+    bytes2longs(data.buf, dlen, d, 0);
+    bytes2longs(key.buf, klen, k, 0);
     btea(d, -alen, k, rounds);
     rc = longs2bytes(d, alen, retbuf, padding);
     Py_END_ALLOW_THREADS
+
+    PyBuffer_Release(&data);
+    PyBuffer_Release(&key);
 
     if (padding) {
         if (rc >= 0) {
@@ -346,6 +361,8 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 cleanup:
     XFREE(d);
     Py_XDECREF(retval);
+    PyBuffer_Release(&data);
+    PyBuffer_Release(&key);
     return NULL;
 }
 
