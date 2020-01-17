@@ -32,10 +32,6 @@
 #define TOSTRING(x) #x
 #define VALUE_TO_STRING(x) TOSTRING(x)
 
-#ifndef Py_TYPE
-#define Py_TYPE(ob) (((PyObject*)(ob))->ob_type)
-#endif
-
 #if PY_MAJOR_VERSION >= 3
 #define PyString_FromStringAndSize PyBytes_FromStringAndSize
 #define PyString_AS_STRING PyBytes_AsString
