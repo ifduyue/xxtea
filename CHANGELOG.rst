@@ -1,11 +1,18 @@
 CHANGELOG
 --------------
 
+v2.0.0 2020/01/18
+~~~~~~~~~~~~~~~~~~~
+
+- Drop support for EOL Python 2.6, 3.2 and 3.3
+- Fix DeprecationWarning: PY_SSIZE_T_CLEAN will be required for '#'
+
 v1.3.0 2018/10/24
 ~~~~~~~~~~~~~~~~~~~
 
 - Fixed a memory leak in decrypt_hex
 - Deployed wheels automatically
+- Support specifying rounds
 
 v1.2.0 2018/05/09
 ~~~~~~~~~~~~~~~~~~~
