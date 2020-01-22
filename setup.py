@@ -31,7 +31,7 @@ setup(
     author_email='ifduyue@gmail.com',
     url='https://github.com/ifduyue/xxtea',
     description="xxtea is a simple block cipher",
-    long_description=open('README.rst').read(),
+    long_description=open('README.rst', 'rb').read().decode('utf8'),
     license="BSD",
     keywords="xxtea",
     ext_modules=[extension],
