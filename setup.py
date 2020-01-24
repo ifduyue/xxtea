@@ -1,7 +1,10 @@
 from setuptools import setup, Extension
 import os
 
-VERSION = "2.0.0"
+with open('xxtea.c') as f:
+    for line in f:
+        if line.startswith("#define VERSION "):
+            VERSION = eval(line.rsplit(None, 1)[-1])
 
 if os.name == 'posix':
     extra_compile_args = [
@@ -16,13 +19,8 @@ if os.name == 'posix':
 else:
     extra_compile_args = None
 
-define_macros = [
-    ('VERSION', VERSION),
-]
-
 extension = Extension('xxtea', ['xxtea.c'],
-                      extra_compile_args=extra_compile_args,
-                      define_macros=define_macros)
+                      extra_compile_args=extra_compile_args)
 
 setup(
     name="xxtea",

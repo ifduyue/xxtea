@@ -29,8 +29,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#define TOSTRING(x) #x
-#define VALUE_TO_STRING(x) TOSTRING(x)
+#define VERSION "2.0.0"
 
 #if PY_MAJOR_VERSION >= 3
 #define PyString_FromStringAndSize PyBytes_FromStringAndSize
@@ -446,7 +445,7 @@ void initxxtea(void)
         INITERROR;
     }
 
-    PyModule_AddStringConstant(module, "VERSION", VALUE_TO_STRING(VERSION));
+    PyModule_AddStringConstant(module, "VERSION", VERSION);
 
 #if PY_MAJOR_VERSION >= 3
     return module;

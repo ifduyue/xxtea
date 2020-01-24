@@ -11,6 +11,10 @@ class TestXXTEA(unittest.TestCase):
     enc = b'x\xf4e\xeb\x1bI\x85\x88}\x11\x84.\xde\x856!'
     hexenc = b'78f465eb1b4985887d11842ede853621'
 
+    def test_version(self):
+        version = xxtea.VERSION
+        self.assertEqual(True, isinstance(version, str))
+
     def test_encrypt(self):
         enc = xxtea.encrypt(self.data, self.key)
         self.assertEqual(enc, self.enc)
