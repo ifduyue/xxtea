@@ -40,6 +40,8 @@ matrix:
       arch: amd64
     - python: pypy
       arch: amd64
+    - python: pypy3
+      arch: amd64
     # linux wheels
     - dist: trusty
       sudo: required
