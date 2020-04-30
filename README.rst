@@ -149,7 +149,7 @@ Catching Exceptions
 ---------------------
 
 When calling ``decrypt()`` and ``decrypt_hex()``, it is possible that a ``ValueError`` or a ``TypeError``
-was raised. Better to catch them, or your program will exit.
+is raised:
 
 .. code-block:: python
 
