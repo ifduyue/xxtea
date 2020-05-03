@@ -1,2 +1,3 @@
 include README.rst
 include xxtea.c
+include LICENSE
