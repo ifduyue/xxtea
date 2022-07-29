@@ -37,6 +37,9 @@
 #endif
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
+#if defined(_MSC_VER) && !defined(inline)
+#define inline __inline /* required for py2.x support on windows */
+#endif
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 { ob->ob_size = size; }
 #define Py_SET_SIZE(ob, size) _Py_SET_SIZE((PyVarObject*)(ob), size)
