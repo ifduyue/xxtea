@@ -8,16 +8,6 @@ matrix:
       arch: arm64
     - python: 2.7
       arch: amd64
-    - python: 3.4
-      arch: arm64
-      dist: trusty
-    - python: 3.4
-      arch: amd64
-      dist: trusty
-    - python: 3.5
-      arch: arm64
-    - python: 3.5
-      arch: amd64
     - python: 3.6
       arch: arm64
     - python: 3.6
@@ -34,6 +24,18 @@ matrix:
     - python: 3.8
       arch: amd64
       dist: xenial
+    - python: 3.9
+      arch: arm64
+      dist: bionic
+    - python: 3.9
+      arch: amd64
+      dist: bionic
+    - python: 3.10
+      arch: arm64
+      dist: bionic
+    - python: 3.10
+      arch: amd64
+      dist: bionic
     - python: nightly
       arch: arm64
     - python: nightly
