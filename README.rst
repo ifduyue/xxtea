@@ -1,12 +1,9 @@
-xxtea |travis-badge| |appveyor-badge| |pypi-badge| |supported-pythons-badge| |license-badge|
+xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-badge|
 ==============================================================================================
 
-.. |travis-badge| image:: https://travis-ci.org/ifduyue/xxtea.svg
-   :target: https://travis-ci.org/ifduyue/xxtea
-
-.. |appveyor-badge| image:: https://ci.appveyor.com/api/projects/status/mitcnsayvbr10gt4?svg=true
-   :target: https://ci.appveyor.com/project/duyue/xxtea
-   :alt: Appveyor Build Status
+.. |github-actions-badge| image:: https://github.com/ifduyue/xxtea/actions/workflows/test.yml/badge.svg
+    :target: https://github.com/ifduyue/xxtea/actions/workflows/test.yml
+    :alt: Github Actions Status
 
 .. |pypi-badge| image:: https://img.shields.io/pypi/v/xxtea.svg
    :target: https://pypi.python.org/pypi/xxtea
