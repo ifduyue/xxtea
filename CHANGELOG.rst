@@ -1,6 +1,12 @@
 CHANGELOG
 --------------
 
+v2.1.0 2023/04/14
+~~~~~~~~~~~~~~~~~~~
+
+- Drop support for EOL Python 2.7, 3.4 and 3.5
+- Add support for Python 3.9, 1.10 and 3.11
+
 v2.0.0 2020/01/24
 ~~~~~~~~~~~~~~~~~~~
 
