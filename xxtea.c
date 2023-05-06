@@ -415,8 +415,6 @@ static PyMethodDef methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
-#if PY_MAJOR_VERSION >= 3
-
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "xxtea",
@@ -429,35 +427,20 @@ static struct PyModuleDef moduledef = {
     NULL
 };
 
-#define INITERROR return NULL
 
 PyObject *PyInit_xxtea(void)
-
-#else
-
-#define INITERROR return
-
-void initxxtea(void)
-#endif
 {
-#if PY_MAJOR_VERSION >= 3
     module = PyModule_Create(&moduledef);
-#else
-    module = Py_InitModule("xxtea", methods);
-#endif
 
     if (module == NULL) {
-        INITERROR;
+        return NULL;
     }
     if (!(binascii = PyImport_ImportModule("binascii"))) {
         Py_DECREF(module);
-        INITERROR;
+        return NULL;
     }
 
     PyModule_AddStringConstant(module, "VERSION", VERSION);
 
-#if PY_MAJOR_VERSION >= 3
     return module;
-#endif
 }
-
