@@ -1,6 +1,14 @@
 CHANGELOG
 --------------
 
+v3.0.0 2023/05/06
+~~~~~~~~~~~~~~~~~~~
+
+- Add support for Python 3.11
+- Fix Py_SET_SIZE for Python 2.x
+- Set up github actions and remove TravisCI and AppVeyor
+- Drop support for Python 2.7, 3.4 and 3.5. Now xxtea requires Python >= 3.6
+
 v2.1.0 2023/04/14
 ~~~~~~~~~~~~~~~~~~~
 
