@@ -6,21 +6,7 @@ with open('xxtea.c') as f:
         if line.startswith("#define VERSION "):
             VERSION = eval(line.rsplit(None, 1)[-1])
 
-if os.name == 'posix':
-    extra_compile_args = [
-        "-std=c99",
-        "-O3",
-        "-Wall",
-        "-W",
-        "-Wundef",
-        # ref: http://bugs.python.org/issue21121
-        "-Wno-error=declaration-after-statement",
-    ]
-else:
-    extra_compile_args = None
-
-extension = Extension('xxtea', ['xxtea.c'],
-                      extra_compile_args=extra_compile_args)
+extension = Extension('xxtea', ['xxtea.c'])
 
 setup(
     name="xxtea",
