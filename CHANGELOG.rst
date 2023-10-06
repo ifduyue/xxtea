@@ -1,6 +1,12 @@
 CHANGELOG
 --------------
 
+v3.2.0 2023/10/06
+~~~~~~~~~~~~~~~~~~~
+
+- Build wheels for Python 3.12
+- Remove custom extra_compile_args from setup.py
+
 v3.1.0 2023/07/29
 ~~~~~~~~~~~~~~~~~~~
 
