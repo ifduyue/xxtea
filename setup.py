@@ -35,5 +35,4 @@ setup(
         'Programming Language :: Python :: 3.12',
     ],
     python_requires=">=3.6",
-    test_suite="tests",
 )
