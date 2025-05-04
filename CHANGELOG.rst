@@ -4,7 +4,7 @@ CHANGELOG
 v3.3.0 2024/08/09
 ~~~~~~~~~~~~~~~~~~~
 
-- Build wheels for Python 3.12
+- Build wheels for Python 3.13
 
 
 v3.2.0 2023/10/06
