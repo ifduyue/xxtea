@@ -1,6 +1,13 @@
 CHANGELOG
 --------------
 
+v3.4.0 2025/10/01
+~~~~~~~~~~~~~~~~~~~
+
+- Build wheels for Python 3.14
+- Drop support for Python 3.6
+
+
 v3.3.0 2024/08/09
 ~~~~~~~~~~~~~~~~~~~
 
