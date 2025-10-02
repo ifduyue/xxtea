@@ -465,7 +465,7 @@ static int _clear(PyObject *module)
     return 0;
 }
 
-static int _free(void *module)
+static void _free(void *module)
 {
     _clear((PyObject *)module);
 }
