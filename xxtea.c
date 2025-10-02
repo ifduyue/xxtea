@@ -29,7 +29,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#define VERSION "3.5.0.dev2"
+#define VERSION "3.5.0.dev3"
 
 #if PY_MAJOR_VERSION >= 3
 #define PyString_FromStringAndSize PyBytes_FromStringAndSize
@@ -447,6 +447,24 @@ static PyModuleDef_Slot slots[] = {
 };
 
 
+static int _traverse(PyObject *module, visitproc visit, void *arg)
+{
+    xxtea_mod_state *module_state = (xxtea_mod_state*)PyModule_GetState(module);
+    if (module_state) {
+        Py_VISIT(module_state->binascii);
+    }
+    return 0;
+}
+
+static int _clear(PyObject *module)
+{
+    xxtea_mod_state *module_state = (xxtea_mod_state*)PyModule_GetState(module);
+    if (module_state) {
+        Py_CLEAR(module_state->binascii);
+    }
+    return 0;
+}
+
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "xxtea",
@@ -454,9 +472,9 @@ static struct PyModuleDef moduledef = {
     sizeof(struct xxtea_mod_state),
     methods,
     slots,
-    NULL,
-    NULL,
-    NULL
+    _traverse,
+    _clear,
+    _clear
 };
 
 PyObject *PyInit_xxtea(void)
