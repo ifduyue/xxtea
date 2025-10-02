@@ -482,7 +482,7 @@ static struct PyModuleDef moduledef = {
     _free
 };
 
-PyMODINIT_FUNC *PyInit_xxtea(void)
+PyMODINIT_FUNC PyInit_xxtea(void)
 {
     return PyModuleDef_Init(&moduledef);
 }
