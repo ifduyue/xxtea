@@ -29,7 +29,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#define VERSION "3.5.0.dev1"
+#define VERSION "3.5.0.dev2"
 
 #if PY_MAJOR_VERSION >= 3
 #define PyString_FromStringAndSize PyBytes_FromStringAndSize
@@ -50,7 +50,9 @@ static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 #define DELTA 0x9e3779b9
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
 
-static PyObject *module, *binascii;
+typedef struct xxtea_mod_state {
+    PyObject *binascii;
+} xxtea_mod_state;
 
 static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int rounds)
 {
@@ -260,13 +262,15 @@ PyDoc_STRVAR(
 static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject *retval, *tmp;
+    xxtea_mod_state *module_state;
     retval = tmp = NULL;
 
     if (!(tmp = xxtea_encrypt(self, args, kwargs))) {
         return NULL;
     }
 
-    retval = PyObject_CallMethod(binascii, "hexlify", "(O)", tmp, NULL);
+    module_state = (xxtea_mod_state*)PyModule_GetState(self);
+    retval = PyObject_CallMethod(module_state->binascii, "hexlify", "(O)", tmp, NULL);
     Py_DECREF(tmp);
 
     return retval;
@@ -375,6 +379,7 @@ PyDoc_STRVAR(
 static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     PyObject *data, *key, *padding, *rounds, *retval, *tmp;
+    xxtea_mod_state *module_state;
 
     data = key = retval = tmp = NULL;
     padding = Py_BuildValue("i", 1);
@@ -384,11 +389,12 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
         goto cleanup;
     }
 
-    if (!(tmp = PyObject_CallMethod(binascii, "unhexlify", "(O)", data, NULL))) {
+    module_state = (xxtea_mod_state*)PyModule_GetState(self);
+    if (!(tmp = PyObject_CallMethod(module_state->binascii, "unhexlify", "(O)", data, NULL))) {
         goto cleanup;
     }
 
-    retval = PyObject_CallMethod(module, "decrypt", "(OOOO)", tmp, key, padding, rounds, NULL);
+    retval = PyObject_CallMethod(self, "decrypt", "(OOOO)", tmp, key, padding, rounds, NULL);
     Py_DECREF(tmp);
 
     return retval;
@@ -406,6 +412,23 @@ cleanup:
 /* ref: https://docs.python.org/2/howto/cporting.html */
 
 
+static int _exec(PyObject *module)
+{
+    xxtea_mod_state *state = (xxtea_mod_state*)PyModule_GetState(module);
+    if (state == NULL) {
+        return -1;
+    }
+
+    state->binascii = PyImport_ImportModule("binascii");
+    if (!state->binascii) {
+        PyErr_SetString(PyExc_ImportError, "Failed to import binascii module");
+        return -1;
+    }
+
+    PyModule_AddStringConstant(module, "VERSION", VERSION);
+
+    return 0;
+}
 
 static PyMethodDef methods[] = {
     {"encrypt", (PyCFunction)xxtea_encrypt, METH_VARARGS | METH_KEYWORDS, xxtea_encrypt_doc},
@@ -415,32 +438,28 @@ static PyMethodDef methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
+static PyModuleDef_Slot slots[] = {
+    {Py_mod_exec, _exec},
+#ifdef Py_GIL_DISABLED
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+#endif
+    {0, NULL}
+};
+
+
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "xxtea",
     NULL,
-    -1,
+    sizeof(struct xxtea_mod_state),
     methods,
-    NULL,
+    slots,
     NULL,
     NULL,
     NULL
 };
 
-
 PyObject *PyInit_xxtea(void)
 {
-    module = PyModule_Create(&moduledef);
-
-    if (module == NULL) {
-        return NULL;
-    }
-    if (!(binascii = PyImport_ImportModule("binascii"))) {
-        Py_DECREF(module);
-        return NULL;
-    }
-
-    PyModule_AddStringConstant(module, "VERSION", VERSION);
-
-    return module;
+    return PyModuleDef_Init(&moduledef);
 }
