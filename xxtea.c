@@ -465,6 +465,11 @@ static int _clear(PyObject *module)
     return 0;
 }
 
+static int _free(void *module)
+{
+    _clear((PyObject *)module);
+}
+
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "xxtea",
@@ -474,7 +479,7 @@ static struct PyModuleDef moduledef = {
     slots,
     _traverse,
     _clear,
-    _clear
+    _free
 };
 
 PyObject *PyInit_xxtea(void)
