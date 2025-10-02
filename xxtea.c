@@ -29,7 +29,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#define VERSION "3.5.0"
+#define VERSION "3.5.1.dev1"
 
 #if PY_MAJOR_VERSION >= 3
 #define PyString_FromStringAndSize PyBytes_FromStringAndSize
@@ -482,7 +482,7 @@ static struct PyModuleDef moduledef = {
     _free
 };
 
-PyObject *PyInit_xxtea(void)
+PyMODINIT_FUNC *PyInit_xxtea(void)
 {
     return PyModuleDef_Init(&moduledef);
 }
