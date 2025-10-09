@@ -27,6 +27,12 @@ jobs:
           - os: ubuntu-22.04
             archs: "arm64_v8a, x86_64"
             platform: "android"
+          - os: macos-14
+            archs: "arm64_iphoneos,arm64_iphonesimulator"
+            platform: "ios"
+          - os: macos-13
+            archs: "x86_64_iphonesimulator"
+            platform: "ios"
 
     steps:
       - name: Disable git autocrlf
