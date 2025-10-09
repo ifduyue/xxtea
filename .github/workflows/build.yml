@@ -11,6 +11,7 @@ jobs:
         os: [ubuntu-22.04]
         archs: ["x86_64, i686", "aarch64", "ppc64le", "s390x"]
         build: ["manylinux", "musllinux"]
+        platform: ["auto"]
         include:
           - os: windows-2022
             archs: "AMD64"
@@ -20,6 +21,9 @@ jobs:
             archs: "ARM64"
           - os: macos-13
             archs: "x86_64, arm64"
+          - os: ubuntu-22.04
+            archs: "wasm32"
+            platform: "pyodide"
 
     steps:
       - name: Disable git autocrlf
@@ -41,6 +45,7 @@ jobs:
         env:
           CIBW_ARCHS: "${{ matrix.archs }}"
           CIBW_BUILD: "${{ matrix.build && '*-' || ''}}${{ matrix.build }}*"
+          CIBW_PLATFORM: "${{ matrix.platform }}"
           CIBW_PRERELEASE_PYTHONS: "${{ !startsWith(github.ref, 'refs/tags/v') }}"
 
       - uses: actions/upload-artifact@v4
