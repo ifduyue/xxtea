@@ -24,6 +24,9 @@ jobs:
           - os: ubuntu-22.04
             archs: "wasm32"
             platform: "pyodide"
+          - os: ubuntu-22.04
+            archs: "arm64_v8a, x86_64"
+            platform: "android"
 
     steps:
       - name: Disable git autocrlf
