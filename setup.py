@@ -15,6 +15,7 @@ setup(
     url="https://github.com/ifduyue/xxtea",
     description="xxtea is a simple block cipher",
     long_description=open("README.rst", "rb").read().decode("utf8"),
+    long_description_content_type="text/x-rst",
     license="BSD",
     keywords="xxtea",
     ext_modules=[extension],
