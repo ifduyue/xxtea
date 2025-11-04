@@ -1,6 +1,13 @@
 CHANGELOG
 --------------
 
+v3.6.0 2025/11/04
+~~~~~~~~~~~~~~~~~~~
+
+- Build Android and iOS wheels
+- Build pypy and pypy-eol wheels
+
+
 v3.5.0 2025/10/02
 ~~~~~~~~~~~~~~~~~~~
 
