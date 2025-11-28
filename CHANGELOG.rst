@@ -1,6 +1,12 @@
 CHANGELOG
 --------------
 
+v3.7.0 2025/11/28
+~~~~~~~~~~~~~~~~~~~
+
+- Build linux riscv64 wheels
+- Build linux armv7l wheels
+
 v3.6.0 2025/11/04
 ~~~~~~~~~~~~~~~~~~~
 
