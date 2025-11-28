@@ -29,7 +29,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#define VERSION "3.7.0.dev1"
+#define VERSION "3.7.0.dev2"
 
 #if PY_MAJOR_VERSION >= 3
 #define PyString_FromStringAndSize PyBytes_FromStringAndSize
