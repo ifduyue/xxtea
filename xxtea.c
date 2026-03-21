@@ -107,7 +107,7 @@ static int bytes2longs(const char *in, int inlen, unsigned int *out, int padding
     /* PKCS#7 padding */
     if (padding) {
         pad = 4 - (inlen & 3);
-        /* make sure lenght of out >= 2 */
+        /* make sure length of out >= 2 */
         pad = (inlen < 4) ? pad + 4 : pad;
         for (i = inlen; i < inlen + pad; i++) {
             out[i >> 2] |= pad << ((i & 3) << 3);
