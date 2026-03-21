@@ -31,15 +31,7 @@
 
 #define VERSION "3.8.0.dev1"
 
-#if PY_MAJOR_VERSION >= 3
-#define PyString_FromStringAndSize PyBytes_FromStringAndSize
-#define PyString_AS_STRING PyBytes_AsString
-#endif
-
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
-#if defined(_MSC_VER) && !defined(inline)
-#define inline __inline /* required for py2.x support on windows */
-#endif
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 { ob->ob_size = size; }
 #define Py_SET_SIZE(ob, size) _Py_SET_SIZE((PyVarObject*)(ob), size)
@@ -233,13 +225,13 @@ static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
 
-    retval = PyString_FromStringAndSize(NULL, (alen << 2));
+    retval = PyBytes_FromStringAndSize(NULL, (alen << 2));
 
     if (!retval) {
         goto cleanup;
     }
 
-    retbuf = PyString_AS_STRING(retval);
+    retbuf = PyBytes_AsString(retval);
     longs2bytes(d, alen, retbuf, 0);
 
     free(d);
@@ -314,13 +306,13 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
         goto cleanup;
     }
 
-    retval = PyString_FromStringAndSize(NULL, dlen);
+    retval = PyBytes_FromStringAndSize(NULL, dlen);
 
     if (!retval) {
         goto cleanup;
     }
 
-    retbuf = PyString_AS_STRING(retval);
+    retbuf = PyBytes_AsString(retval);
 
     /* not divided by 4, or length < 8 */
     if (dlen & 3 || dlen < 8) {
