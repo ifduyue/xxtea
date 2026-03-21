@@ -388,6 +388,8 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
 
     retval = PyObject_CallMethod(self, "decrypt", "(OOOO)", tmp, key, padding, rounds, NULL);
     Py_DECREF(tmp);
+    Py_DECREF(padding);
+    Py_DECREF(rounds);
 
     return retval;
 
