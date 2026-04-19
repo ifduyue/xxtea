@@ -29,16 +29,12 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#define VERSION "3.8.0"
+#define VERSION "4.0.0.dev1"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 { ob->ob_size = size; }
 #define Py_SET_SIZE(ob, size) _Py_SET_SIZE((PyVarObject*)(ob), size)
-#endif
-
-#if PY_VERSION_HEX >= 0x03080000 && PY_VERSION_HEX < 0x03090000
-#define PyObject_Vectorcall _PyObject_Vectorcall
 #endif
 
 #define XFREE(o) do { if ((o) != NULL) free(o); } while (0)
@@ -267,8 +263,7 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     }
 
     module_state = (xxtea_mod_state*)PyModule_GetState(self);
-    PyObject *args_[1] = { tmp };
-    retval = PyObject_Vectorcall(module_state->binascii_hexlify, args_, 1, NULL);
+    retval = PyObject_CallOneArg(module_state->binascii_hexlify, tmp);
     Py_DECREF(tmp);
 
     return retval;
@@ -388,8 +383,7 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     }
 
     module_state = (xxtea_mod_state*)PyModule_GetState(self);
-    PyObject *args_[1] = {data};
-    if (!(tmp = PyObject_Vectorcall(module_state->binascii_unhexlify, args_, 1, NULL))) {
+    if (!(tmp = PyObject_CallOneArg(module_state->binascii_unhexlify, data))) {
         goto cleanup;
     }
 
