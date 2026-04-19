@@ -37,6 +37,10 @@ static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 #define Py_SET_SIZE(ob, size) _Py_SET_SIZE((PyVarObject*)(ob), size)
 #endif
 
+#if PY_VERSION_HEX >= 0x03080000 && PY_VERSION_HEX < 0x03090000
+#define _PyObject_CallOneArg PyObject_CallOneArg
+#endif
+
 #define XFREE(o) do { if ((o) != NULL) free(o); } while (0)
 
 #define DELTA 0x9e3779b9
