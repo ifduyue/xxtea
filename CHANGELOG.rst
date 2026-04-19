@@ -1,6 +1,12 @@
 CHANGELOG
 --------------
 
+v3.8.0 2026/04/19
+~~~~~~~~~~~~~~~~~~~
+
+- Faster encrypt_hex and decrypt_hex by using PyObject_Vectorcall instead of PyObject_CallMethod
+- Drop support for Python 3.7
+
 v3.7.0 2025/11/28
 ~~~~~~~~~~~~~~~~~~~
 
