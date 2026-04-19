@@ -29,7 +29,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#define VERSION "3.8.0.dev1"
+#define VERSION "3.8.0.dev2"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
@@ -43,7 +43,8 @@ static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
 
 typedef struct xxtea_mod_state {
-    PyObject *binascii;
+    PyObject *binascii_hexlify;
+    PyObject *binascii_unhexlify;
 } xxtea_mod_state;
 
 static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int rounds)
@@ -262,7 +263,7 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     }
 
     module_state = (xxtea_mod_state*)PyModule_GetState(self);
-    retval = PyObject_CallMethod(module_state->binascii, "hexlify", "(O)", tmp, NULL);
+    retval = PyObject_CallOneArg(module_state->binascii_hexlify, tmp);
     Py_DECREF(tmp);
 
     return retval;
@@ -382,7 +383,7 @@ static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     }
 
     module_state = (xxtea_mod_state*)PyModule_GetState(self);
-    if (!(tmp = PyObject_CallMethod(module_state->binascii, "unhexlify", "(O)", data, NULL))) {
+    if (!(tmp = PyObject_CallOneArg(module_state->binascii_unhexlify, data))) {
         goto cleanup;
     }
 
@@ -411,10 +412,31 @@ static int _exec(PyObject *module)
         return -1;
     }
 
-    state->binascii = PyImport_ImportModule("binascii");
-    if (!state->binascii) {
+    int err = 0;
+    PyObject *binascii = PyImport_ImportModule("binascii");
+    if (!binascii) {
         PyErr_SetString(PyExc_ImportError, "Failed to import binascii module");
         return -1;
+    }
+
+    state->binascii_hexlify = PyObject_GetAttrString(binascii, "hexlify");
+    state->binascii_unhexlify = PyObject_GetAttrString(binascii, "unhexlify");
+    Py_DECREF(binascii);
+
+    if (!state->binascii_hexlify) {
+        PyErr_SetString(PyExc_AttributeError, "Failed to get binascii.hexlify");
+        err = 2;
+    }
+    if (!state->binascii_hexlify) {
+        PyErr_SetString(PyExc_AttributeError, "Failed to get binascii.hexlify");
+        err = 3;
+    }
+
+    if (err) {
+        Py_XDECREF(state->binascii_hexlify);
+        Py_XDECREF(state->binascii_unhexlify);
+        return -err;
+
     }
 
     PyModule_AddStringConstant(module, "VERSION", VERSION);
@@ -443,7 +465,8 @@ static int _traverse(PyObject *module, visitproc visit, void *arg)
 {
     xxtea_mod_state *module_state = (xxtea_mod_state*)PyModule_GetState(module);
     if (module_state) {
-        Py_VISIT(module_state->binascii);
+        Py_VISIT(module_state->binascii_hexlify);
+        Py_VISIT(module_state->binascii_unhexlify);
     }
     return 0;
 }
@@ -452,7 +475,8 @@ static int _clear(PyObject *module)
 {
     xxtea_mod_state *module_state = (xxtea_mod_state*)PyModule_GetState(module);
     if (module_state) {
-        Py_CLEAR(module_state->binascii);
+        Py_CLEAR(module_state->binascii_hexlify);
+        Py_CLEAR(module_state->binascii_unhexlify);
     }
     return 0;
 }
