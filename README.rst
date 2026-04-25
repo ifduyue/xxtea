@@ -1,5 +1,5 @@
-xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-badge|
-==============================================================================================
+xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-badge| |codspeed-badge|
+=============================================================================================================
 
 .. |github-actions-badge| image:: https://github.com/ifduyue/xxtea/actions/workflows/test.yml/badge.svg
     :target: https://github.com/ifduyue/xxtea/actions/workflows/test.yml
@@ -16,6 +16,10 @@ xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-bad
 .. |license-badge| image:: https://img.shields.io/pypi/l/xxtea.svg
     :target: https://pypi.python.org/pypi/xxtea
     :alt: License
+
+.. |codspeed-badge| image:: https://img.shields.io/endpoint?url=https://codspeed.io/badge.json
+    :target: https://codspeed.io/ifduyue/xxtea?utm_source=badge
+    :alt: CodSpeed
 
 .. _XXTEA: http://en.wikipedia.org/wiki/XXTEA
 .. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L130
