@@ -242,6 +242,11 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                 unsigned long val = PyLong_AsUnsignedLong(value);
                 if (val == (unsigned long)-1 && PyErr_Occurred())
                     return -1;
+                if (val > UINT_MAX) {
+                    PyErr_SetString(PyExc_OverflowError,
+                        "rounds value too large");
+                    return -1;
+                }
                 *rounds = (unsigned int)val;
                 rounds_set = 1;
             }
@@ -260,6 +265,10 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
         unsigned long val = PyLong_AsUnsignedLong(args[3]);
         if (val == (unsigned long)-1 && PyErr_Occurred())
             return -1;
+        if (val > UINT_MAX) {
+            PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+            return -1;
+        }
         *rounds = (unsigned int)val;
     }
 
