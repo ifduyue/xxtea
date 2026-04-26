@@ -95,15 +95,16 @@ static void btea(uint32_t *v, int n, uint32_t const key[4], unsigned int rounds)
     }
 }
 
-static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
+static Py_ssize_t bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, int padding)
 {
-    int i, pad;
+    Py_ssize_t i;
+    int pad;
     const unsigned char *s;
 
     s = (const unsigned char *)in;
 
     /* Fast path: process 4 bytes at a time */
-    int nwords = inlen >> 2;
+    Py_ssize_t nwords = inlen >> 2;
     for (i = 0; i < nwords; i++) {
 #if PY_LITTLE_ENDIAN
         memcpy(&out[i], s + 4 * i, 4);
@@ -136,9 +137,10 @@ static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
     return ((i - 1) >> 2) + 1;
 }
 
-static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
+static Py_ssize_t longs2bytes(uint32_t *in, Py_ssize_t inlen, char *out, int padding)
 {
-    int i, outlen, pad;
+    Py_ssize_t i, outlen;
+    int pad;
     unsigned char *s;
 
     s = (unsigned char *)out;
@@ -277,7 +279,7 @@ static inline PyObject *
 _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
               const char *key_buf, int padding, unsigned int rounds)
 {
-    int alen;
+    Py_ssize_t alen;
     PyObject *retval;
     char *retbuf;
     uint32_t *d, k[4];
@@ -293,7 +295,11 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
     }
 
     alen = data_len < 4 ? 2 : (data_len >> 2) + padding;
-    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
+    if (alen > INT_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "data too large");
+        return NULL;
+    }
+    d = (uint32_t *)calloc((size_t)alen, sizeof(uint32_t));
 
     if (d == NULL) {
         return PyErr_NoMemory();
@@ -302,7 +308,7 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
     Py_BEGIN_ALLOW_THREADS
     bytes2longs(data_buf, data_len, d, padding);
     bytes2longs(key_buf, 16, k, 0);
-    btea(d, alen, k, rounds);
+    btea(d, (int)alen, k, rounds);
     Py_END_ALLOW_THREADS
 
     retval = PyBytes_FromStringAndSize(NULL, alen << 2);
@@ -326,7 +332,7 @@ static inline PyObject *
 _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
               const char *key_buf, int padding, unsigned int rounds)
 {
-    int alen, rc;
+    Py_ssize_t alen, rc;
     PyObject *retval;
     char *retbuf;
     uint32_t *d, k[4];
@@ -358,7 +364,12 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
     }
 
     alen = data_len / 4;
-    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
+    if (alen > INT_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "data too large");
+        Py_DECREF(retval);
+        return NULL;
+    }
+    d = (uint32_t *)calloc((size_t)alen, sizeof(uint32_t));
 
     if (d == NULL) {
         Py_DECREF(retval);
@@ -368,7 +379,7 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
     Py_BEGIN_ALLOW_THREADS
     bytes2longs(data_buf, data_len, d, 0);
     bytes2longs(key_buf, 16, k, 0);
-    btea(d, -alen, k, rounds);
+    btea(d, -(int)alen, k, rounds);
     rc = longs2bytes(d, alen, retbuf, padding);
     Py_END_ALLOW_THREADS
 
