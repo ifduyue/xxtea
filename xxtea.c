@@ -188,26 +188,24 @@ static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
  ****************************************************************************/
 
 /*
- * Parse all arguments in a single pass over kwnames.
- * Returns 0 on success, -1 on error (exception set).
- * *data_obj and *key_obj are borrowed references.
+ * Parse all arguments in a single pass.  Returns 0 on success, -1 on error.
  */
 static int
 _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
             PyObject **data_obj, PyObject **key_obj,
             int *padding, unsigned int *rounds)
 {
-    int data_from_pos = 0, key_from_pos = 0;
+    int data_set = 0, key_set = 0, padding_set = 0, rounds_set = 0;
 
     *data_obj = *key_obj = NULL;
     *padding = 1;
     *rounds = 0;
 
-    /* Positional args */
-    if (nargs > 0) { *data_obj = args[0]; data_from_pos = 1; }
-    if (nargs > 1) { *key_obj  = args[1]; key_from_pos  = 1; }
+    /* Positional: data, key */
+    if (nargs > 0) { *data_obj = args[0]; data_set = 1; }
+    if (nargs > 1) { *key_obj  = args[1]; key_set  = 1; }
 
-    /* Keyword args — single loop */
+    /* Keyword loop */
     if (kwnames != NULL) {
         Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
         for (Py_ssize_t i = 0; i < nkwargs; i++) {
@@ -215,31 +213,35 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
             PyObject *value = args[nargs + i];
 
             if (PyUnicode_CompareWithASCIIString(name, "data") == 0) {
-                if (data_from_pos) {
-                    PyErr_Format(PyExc_TypeError,
-                        "argument 'data' given both as positional and keyword");
-                    return -1;
-                }
+                if (data_set) { PyErr_SetString(PyExc_TypeError,
+                    "argument 'data' given both as positional and keyword");
+                    return -1; }
                 *data_obj = value;
-                data_from_pos = 1;
+                data_set = 1;
             }
             else if (PyUnicode_CompareWithASCIIString(name, "key") == 0) {
-                if (key_from_pos) {
-                    PyErr_Format(PyExc_TypeError,
-                        "argument 'key' given both as positional and keyword");
-                    return -1;
-                }
+                if (key_set) { PyErr_SetString(PyExc_TypeError,
+                    "argument 'key' given both as positional and keyword");
+                    return -1; }
                 *key_obj = value;
-                key_from_pos = 1;
+                key_set = 1;
             }
             else if (PyUnicode_CompareWithASCIIString(name, "padding") == 0) {
+                if (nargs > 2) { PyErr_SetString(PyExc_TypeError,
+                    "argument 'padding' given both as positional and keyword");
+                    return -1; }
                 *padding = PyObject_IsTrue(value) ? 1 : 0;
+                padding_set = 1;
             }
             else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
+                if (nargs > 3) { PyErr_SetString(PyExc_TypeError,
+                    "argument 'rounds' given both as positional and keyword");
+                    return -1; }
                 unsigned long val = PyLong_AsUnsignedLong(value);
                 if (val == (unsigned long)-1 && PyErr_Occurred())
                     return -1;
                 *rounds = (unsigned int)val;
+                rounds_set = 1;
             }
             else {
                 PyErr_Format(PyExc_TypeError,
@@ -247,6 +249,16 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                 return -1;
             }
         }
+    }
+
+    /* Positional: padding, rounds (only if not set via keyword) */
+    if (nargs > 2 && !padding_set)
+        *padding = PyObject_IsTrue(args[2]) ? 1 : 0;
+    if (nargs > 3 && !rounds_set) {
+        unsigned long val = PyLong_AsUnsignedLong(args[3]);
+        if (val == (unsigned long)-1 && PyErr_Occurred())
+            return -1;
+        *rounds = (unsigned int)val;
     }
 
     if (!*data_obj || !*key_obj) {
