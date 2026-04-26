@@ -196,6 +196,19 @@ _get_arg(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
          Py_ssize_t pos, const char *name)
 {
     if (pos < nargs) {
+        /* Check for duplicate: same name also passed as keyword */
+        if (kwnames != NULL) {
+            Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
+            for (Py_ssize_t i = 0; i < nkwargs; i++) {
+                if (PyUnicode_CompareWithASCIIString(
+                        PyTuple_GET_ITEM(kwnames, i), name) == 0) {
+                    PyErr_Format(PyExc_TypeError,
+                        "argument '%s' given both as positional and keyword",
+                        name);
+                    return NULL;
+                }
+            }
+        }
         return args[pos];
     }
     if (kwnames != NULL) {
@@ -394,8 +407,10 @@ xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
     key_obj = _get_arg(args, nargs, kwnames, 1, "key");
 
     if (!data_obj || !key_obj) {
-        PyErr_Format(PyExc_TypeError,
-            "encrypt() missing required arguments: 'data' and 'key'");
+        if (!PyErr_Occurred()) {
+            PyErr_Format(PyExc_TypeError,
+                "encrypt() missing required arguments: 'data' and 'key'");
+        }
         return NULL;
     }
 
@@ -450,8 +465,10 @@ xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
     key_obj = _get_arg(args, nargs, kwnames, 1, "key");
 
     if (!data_obj || !key_obj) {
-        PyErr_Format(PyExc_TypeError,
-            "encrypt_hex() missing required arguments: 'data' and 'key'");
+        if (!PyErr_Occurred()) {
+            PyErr_Format(PyExc_TypeError,
+                "encrypt_hex() missing required arguments: 'data' and 'key'");
+        }
         return NULL;
     }
 
@@ -513,8 +530,10 @@ xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
     key_obj = _get_arg(args, nargs, kwnames, 1, "key");
 
     if (!data_obj || !key_obj) {
-        PyErr_Format(PyExc_TypeError,
-            "decrypt() missing required arguments: 'data' and 'key'");
+        if (!PyErr_Occurred()) {
+            PyErr_Format(PyExc_TypeError,
+                "decrypt() missing required arguments: 'data' and 'key'");
+        }
         return NULL;
     }
 
@@ -567,8 +586,10 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
     key_obj = _get_arg(args, nargs, kwnames, 1, "key");
 
     if (!data_obj || !key_obj) {
-        PyErr_Format(PyExc_TypeError,
-            "decrypt_hex() missing required arguments: 'data' and 'key'");
+        if (!PyErr_Occurred()) {
+            PyErr_Format(PyExc_TypeError,
+                "decrypt_hex() missing required arguments: 'data' and 'key'");
+        }
         return NULL;
     }
 
