@@ -207,6 +207,12 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
     if (nargs > 0) { *data_obj = args[0]; data_set = 1; }
     if (nargs > 1) { *key_obj  = args[1]; key_set  = 1; }
 
+    if (nargs > 4) {
+        PyErr_SetString(PyExc_TypeError,
+            "function takes at most 4 positional arguments");
+        return -1;
+    }
+
     /* Keyword loop */
     if (kwnames != NULL) {
         Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
