@@ -27,7 +27,9 @@
 
 #include <Python.h>
 #include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #define VERSION "4.0.0.dev1"
 
@@ -39,7 +41,7 @@ static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 
 #define XFREE(o) do { if ((o) != NULL) free(o); } while (0)
 
-#define DELTA 0x9e3779b9
+#define DELTA 0x9e3779b9U
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
 
 typedef struct xxtea_mod_state {
@@ -47,9 +49,9 @@ typedef struct xxtea_mod_state {
     PyObject *binascii_unhexlify;
 } xxtea_mod_state;
 
-static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int rounds)
+static void btea(uint32_t *v, int n, uint32_t const key[4], unsigned int rounds)
 {
-    unsigned int y, z, sum;
+    uint32_t y, z, sum;
     unsigned p, e;
 
     if (n > 1) {          /* Coding Part */
@@ -61,7 +63,7 @@ static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int
             sum += DELTA;
             e = (sum >> 2) & 3;
 
-            for (p = 0; p < n - 1; p++) {
+            for (p = 0; p < (unsigned)(n - 1); p++) {
                 y = v[p + 1];
                 z = v[p] += MX;
             }
@@ -74,13 +76,13 @@ static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int
     else if (n < -1) {    /* Decoding Part */
         n = -n;
         rounds = rounds == 0 ? 6 + 52 / n: rounds;
-        sum = rounds * DELTA;
+        sum = (uint32_t)(rounds * DELTA);
         y = v[0];
 
         do {
             e = (sum >> 2) & 3;
 
-            for (p = n - 1; p > 0; p--) {
+            for (p = (unsigned)(n - 1); p > 0; p--) {
                 z = v[p - 1];
                 y = v[p] -= MX;
             }
@@ -93,16 +95,29 @@ static void btea(unsigned int *v, int n, unsigned int const key[4], unsigned int
     }
 }
 
-static int bytes2longs(const char *in, int inlen, unsigned int *out, int padding)
+static int bytes2longs(const char *in, int inlen, uint32_t *out, int padding)
 {
     int i, pad;
     const unsigned char *s;
 
     s = (const unsigned char *)in;
 
-    /* (i & 3) << 3 -> [0, 8, 16, 24] */
-    for (i = 0; i < inlen;  i++) {
-        out[i >> 2] |= s[i] << ((i & 3) << 3);
+    /* Fast path: process 4 bytes at a time */
+    int nwords = inlen >> 2;
+    for (i = 0; i < nwords; i++) {
+#if PY_LITTLE_ENDIAN
+        memcpy(&out[i], s + 4 * i, 4);
+#else
+        const unsigned char *p = s + 4 * i;
+        out[i] = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+                 ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+#endif
+    }
+
+    /* Handle remaining 0-3 bytes */
+    i = nwords << 2;
+    for (; i < inlen; i++) {
+        out[i >> 2] |= (uint32_t)s[i] << ((i & 3) << 3);
     }
 
     /* PKCS#7 padding */
@@ -110,8 +125,8 @@ static int bytes2longs(const char *in, int inlen, unsigned int *out, int padding
         pad = 4 - (inlen & 3);
         /* make sure length of out >= 2 */
         pad = (inlen < 4) ? pad + 4 : pad;
-        for (i = inlen; i < inlen + pad; i++) {
-            out[i >> 2] |= pad << ((i & 3) << 3);
+        for (; i < inlen + pad; i++) {
+            out[i >> 2] |= (uint32_t)pad << ((i & 3) << 3);
         }
     }
 
@@ -121,7 +136,7 @@ static int bytes2longs(const char *in, int inlen, unsigned int *out, int padding
     return ((i - 1) >> 2) + 1;
 }
 
-static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
+static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
 {
     int i, outlen, pad;
     unsigned char *s;
@@ -129,10 +144,14 @@ static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
     s = (unsigned char *)out;
 
     for (i = 0; i < inlen; i++) {
-        s[4 * i] = in[i] & 0xFF;
-        s[4 * i + 1] = (in[i] >> 8) & 0xFF;
-        s[4 * i + 2] = (in[i] >> 16) & 0xFF;
-        s[4 * i + 3] = (in[i] >> 24) & 0xFF;
+#if PY_LITTLE_ENDIAN
+        memcpy(s + 4 * i, &in[i], 4);
+#else
+        s[4 * i] = (unsigned char)(in[i] & 0xFF);
+        s[4 * i + 1] = (unsigned char)((in[i] >> 8) & 0xFF);
+        s[4 * i + 2] = (unsigned char)((in[i] >> 16) & 0xFF);
+        s[4 * i + 3] = (unsigned char)((in[i] >> 24) & 0xFF);
+#endif
     }
 
     outlen = inlen * 4;
@@ -244,7 +263,7 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
     int alen;
     PyObject *retval;
     char *retbuf;
-    unsigned int *d, k[4];
+    uint32_t *d, k[4];
 
     d = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
@@ -257,7 +276,7 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
     }
 
     alen = data_len < 4 ? 2 : (data_len >> 2) + padding;
-    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
+    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
 
     if (d == NULL) {
         return PyErr_NoMemory();
@@ -293,7 +312,7 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
     int alen, rc;
     PyObject *retval;
     char *retbuf;
-    unsigned int *d, k[4];
+    uint32_t *d, k[4];
 
     d = NULL;
     k[0] = k[1] = k[2] = k[3] = 0;
@@ -322,7 +341,7 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
     }
 
     alen = data_len / 4;
-    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
+    d = (uint32_t *)calloc(alen, sizeof(uint32_t));
 
     if (d == NULL) {
         Py_DECREF(retval);
