@@ -384,6 +384,16 @@ class TestArgPassing(unittest.TestCase):
         with self.assertRaises(TypeError):
             xxtea.decrypt(self.enc, self.key, rounds=1.5)
 
+    def test_too_many_positional_args(self):
+        with self.assertRaises(TypeError):
+            xxtea.encrypt(self.data, self.key, True, 32, 'extra')
+        with self.assertRaises(TypeError):
+            xxtea.decrypt(self.enc, self.key, True, 32, 'extra')
+        with self.assertRaises(TypeError):
+            xxtea.encrypt_hex(self.data, self.key, True, 32, 'extra')
+        with self.assertRaises(TypeError):
+            xxtea.decrypt_hex(self.hexenc, self.key, True, 32, 'extra')
+
     def test_rounds_overflow(self):
         # overflow — keyword
         with self.assertRaises(OverflowError):
