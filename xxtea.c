@@ -238,7 +238,9 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                 if (nargs > 2) { PyErr_SetString(PyExc_TypeError,
                     "argument 'padding' given both as positional and keyword");
                     return -1; }
-                *padding = PyObject_IsTrue(value) ? 1 : 0;
+                int res = PyObject_IsTrue(value);
+                if (res < 0) return -1;
+                *padding = res;
                 padding_set = 1;
             }
             else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
@@ -265,8 +267,11 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
     }
 
     /* Positional: padding, rounds (only if not set via keyword) */
-    if (nargs > 2 && !padding_set)
-        *padding = PyObject_IsTrue(args[2]) ? 1 : 0;
+    if (nargs > 2 && !padding_set) {
+        int res = PyObject_IsTrue(args[2]);
+        if (res < 0) return -1;
+        *padding = res;
+    }
     if (nargs > 3 && !rounds_set) {
         unsigned long val = PyLong_AsUnsignedLong(args[3]);
         if (val == (unsigned long)-1 && PyErr_Occurred())
