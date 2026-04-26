@@ -188,79 +188,71 @@ static int longs2bytes(uint32_t *in, int inlen, char *out, int padding)
  ****************************************************************************/
 
 /*
- * Look up an argument that may be positional (index < nargs) or keyword.
- * Returns the PyObject* value, or NULL if not found.
+ * Parse all arguments in a single pass over kwnames.
+ * Returns 0 on success, -1 on error (exception set).
+ * *data_obj and *key_obj are borrowed references.
  */
-static PyObject *
-_get_arg(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
-         Py_ssize_t pos, const char *name)
+static int
+_parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
+            PyObject **data_obj, PyObject **key_obj,
+            int *padding, unsigned int *rounds)
 {
-    if (pos < nargs) {
-        /* Check for duplicate: same name also passed as keyword */
-        if (kwnames != NULL) {
-            Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
-            for (Py_ssize_t i = 0; i < nkwargs; i++) {
-                if (PyUnicode_CompareWithASCIIString(
-                        PyTuple_GET_ITEM(kwnames, i), name) == 0) {
-                    PyErr_Format(PyExc_TypeError,
-                        "argument '%s' given both as positional and keyword",
-                        name);
-                    return NULL;
-                }
-            }
-        }
-        return args[pos];
-    }
+    int data_from_pos = 0, key_from_pos = 0;
+
+    *data_obj = *key_obj = NULL;
+    *padding = 1;
+    *rounds = 0;
+
+    /* Positional args */
+    if (nargs > 0) { *data_obj = args[0]; data_from_pos = 1; }
+    if (nargs > 1) { *key_obj  = args[1]; key_from_pos  = 1; }
+
+    /* Keyword args — single loop */
     if (kwnames != NULL) {
         Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
         for (Py_ssize_t i = 0; i < nkwargs; i++) {
-            if (PyUnicode_CompareWithASCIIString(
-                    PyTuple_GET_ITEM(kwnames, i), name) == 0) {
-                return args[nargs + i];
+            PyObject *name = PyTuple_GET_ITEM(kwnames, i);
+            PyObject *value = args[nargs + i];
+
+            if (PyUnicode_CompareWithASCIIString(name, "data") == 0) {
+                if (data_from_pos) {
+                    PyErr_Format(PyExc_TypeError,
+                        "argument 'data' given both as positional and keyword");
+                    return -1;
+                }
+                *data_obj = value;
+                data_from_pos = 1;
             }
-        }
-    }
-    return NULL;
-}
-
-/*
- * Keyword argument parsing helper for padding and rounds.
- * Returns 0 on success, -1 on error with exception set.
- */
-static int
-_parse_kwargs(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
-              int *padding, unsigned int *rounds)
-{
-    if (kwnames == NULL) {
-        return 0;
-    }
-
-    Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
-    for (Py_ssize_t i = 0; i < nkwargs; i++) {
-        PyObject *name = PyTuple_GET_ITEM(kwnames, i);
-        PyObject *value = args[nargs + i];
-
-        /* Skip required positional args that may appear as keywords */
-        if (PyUnicode_CompareWithASCIIString(name, "data") == 0 ||
-            PyUnicode_CompareWithASCIIString(name, "key") == 0) {
-            continue;
-        }
-
-        if (PyUnicode_CompareWithASCIIString(name, "padding") == 0) {
-            *padding = PyObject_IsTrue(value) ? 1 : 0;
-        }
-        else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
-            unsigned long val = PyLong_AsUnsignedLong(value);
-            if (val == (unsigned long)-1 && PyErr_Occurred()) {
+            else if (PyUnicode_CompareWithASCIIString(name, "key") == 0) {
+                if (key_from_pos) {
+                    PyErr_Format(PyExc_TypeError,
+                        "argument 'key' given both as positional and keyword");
+                    return -1;
+                }
+                *key_obj = value;
+                key_from_pos = 1;
+            }
+            else if (PyUnicode_CompareWithASCIIString(name, "padding") == 0) {
+                *padding = PyObject_IsTrue(value) ? 1 : 0;
+            }
+            else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
+                unsigned long val = PyLong_AsUnsignedLong(value);
+                if (val == (unsigned long)-1 && PyErr_Occurred())
+                    return -1;
+                *rounds = (unsigned int)val;
+            }
+            else {
+                PyErr_Format(PyExc_TypeError,
+                    "'%U' is an invalid keyword argument", name);
                 return -1;
             }
-            *rounds = (unsigned int)val;
         }
-        else {
-            PyErr_Format(PyExc_TypeError,
-                "'%U' is an invalid keyword argument", name);
-            return -1;
-        }
+    }
+
+    if (!*data_obj || !*key_obj) {
+        PyErr_Format(PyExc_TypeError,
+            "function missing required arguments: 'data' and 'key'");
+        return -1;
     }
 
     return 0;
@@ -395,28 +387,16 @@ PyDoc_STRVAR(
 static PyObject *
 xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    Py_buffer data = {NULL};
-    Py_buffer key = {NULL};
-    PyObject *retval;
-    int padding = 1;
-    unsigned int rounds = 0;
+    Py_buffer data = {NULL}, key = {NULL};
+    PyObject *data_obj, *key_obj, *retval;
+    int padding;
+    unsigned int rounds;
 
-    PyObject *data_obj, *key_obj;
-
-    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
-    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
-
-    if (!data_obj || !key_obj) {
-        if (!PyErr_Occurred()) {
-            PyErr_Format(PyExc_TypeError,
-                "encrypt() missing required arguments: 'data' and 'key'");
-        }
+    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
-    }
 
-    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0) {
+    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0)
         return NULL;
-    }
     if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
         PyBuffer_Release(&data);
         return NULL;
@@ -429,17 +409,9 @@ xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
         return NULL;
     }
 
-    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
-        PyBuffer_Release(&data);
-        PyBuffer_Release(&key);
-        return NULL;
-    }
-
     retval = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
-
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
-
     return retval;
 }
 
@@ -452,29 +424,16 @@ PyDoc_STRVAR(
 static PyObject *
 xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    Py_buffer data = {NULL};
-    Py_buffer key = {NULL};
-    PyObject *tmp, *retval;
-    xxtea_mod_state *module_state;
-    int padding = 1;
-    unsigned int rounds = 0;
+    Py_buffer data = {NULL}, key = {NULL};
+    PyObject *data_obj, *key_obj, *tmp, *retval;
+    int padding;
+    unsigned int rounds;
 
-    PyObject *data_obj, *key_obj;
-
-    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
-    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
-
-    if (!data_obj || !key_obj) {
-        if (!PyErr_Occurred()) {
-            PyErr_Format(PyExc_TypeError,
-                "encrypt_hex() missing required arguments: 'data' and 'key'");
-        }
+    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
-    }
 
-    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0) {
+    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0)
         return NULL;
-    }
     if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
         PyBuffer_Release(&data);
         return NULL;
@@ -487,25 +446,16 @@ xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
         return NULL;
     }
 
-    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
-        PyBuffer_Release(&data);
-        PyBuffer_Release(&key);
-        return NULL;
-    }
-
     tmp = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
-
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
 
-    if (!tmp) {
+    if (!tmp)
         return NULL;
-    }
 
-    module_state = (xxtea_mod_state*)PyModule_GetState(self);
-    retval = PyObject_CallOneArg(module_state->binascii_hexlify, tmp);
+    retval = PyObject_CallOneArg(
+        ((xxtea_mod_state*)PyModule_GetState(self))->binascii_hexlify, tmp);
     Py_DECREF(tmp);
-
     return retval;
 }
 
@@ -518,28 +468,16 @@ PyDoc_STRVAR(
 static PyObject *
 xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    Py_buffer data = {NULL};
-    Py_buffer key = {NULL};
-    PyObject *retval;
-    int padding = 1;
-    unsigned int rounds = 0;
+    Py_buffer data = {NULL}, key = {NULL};
+    PyObject *data_obj, *key_obj, *retval;
+    int padding;
+    unsigned int rounds;
 
-    PyObject *data_obj, *key_obj;
-
-    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
-    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
-
-    if (!data_obj || !key_obj) {
-        if (!PyErr_Occurred()) {
-            PyErr_Format(PyExc_TypeError,
-                "decrypt() missing required arguments: 'data' and 'key'");
-        }
+    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
-    }
 
-    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0) {
+    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0)
         return NULL;
-    }
     if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
         PyBuffer_Release(&data);
         return NULL;
@@ -552,17 +490,9 @@ xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
         return NULL;
     }
 
-    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
-        PyBuffer_Release(&data);
-        PyBuffer_Release(&key);
-        return NULL;
-    }
-
     retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
-
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
-
     return retval;
 }
 
@@ -575,34 +505,19 @@ PyDoc_STRVAR(
 static PyObject *
 xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
+    Py_buffer data = {NULL}, key = {NULL};
     PyObject *data_obj, *key_obj, *tmp = NULL, *retval = NULL;
-    Py_buffer data = {NULL};
-    Py_buffer key = {NULL};
-    xxtea_mod_state *module_state;
-    int padding = 1;
-    unsigned int rounds = 0;
+    int padding;
+    unsigned int rounds;
 
-    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
-    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
-
-    if (!data_obj || !key_obj) {
-        if (!PyErr_Occurred()) {
-            PyErr_Format(PyExc_TypeError,
-                "decrypt_hex() missing required arguments: 'data' and 'key'");
-        }
+    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
-    }
-
-    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
-        return NULL;
-    }
-
-    module_state = (xxtea_mod_state*)PyModule_GetState(self);
 
     /* Unhexlify hex string to bytes */
-    if (!(tmp = PyObject_CallOneArg(module_state->binascii_unhexlify, data_obj))) {
+    if (!(tmp = PyObject_CallOneArg(
+            ((xxtea_mod_state*)PyModule_GetState(self))->binascii_unhexlify,
+            data_obj)))
         return NULL;
-    }
 
     /* Get buffers from unhexlified data and key */
     if (PyObject_GetBuffer(tmp, &data, PyBUF_SIMPLE) < 0) {
@@ -624,11 +539,9 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
     }
 
     retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
-
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
     Py_DECREF(tmp);
-
     return retval;
 }
 
