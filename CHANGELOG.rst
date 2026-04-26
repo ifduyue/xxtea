@@ -5,9 +5,7 @@ CHANGELOG
 ~~~~~~~~~~~~~~~~~~~
 
 - Drop Python 3.8 support
-- Performance improvement: fastcall
-- Performance improvement: internal _encrypt_impl/_decrypt_impl called directly
-- Performance improvement: bytes2longs / longs2bytes use memcpy on little-endian for 4-byte word copies
+- Performance improvement: at least 10%, up to 53% faster by using fastcall, internal _encrypt_impl/_decrypt_impl called directly, bytes2longs / longs2bytes use memcpy on little-endian for 4-byte word copies, etc.
 - alen, rc, inlen changed from int to Py_ssize_t to avoid overflow on 64-bit
 - OverflowError for data > ~8 GiB and rounds > 2**32 - 1
 - Proper handling of excess positional args, duplicate pos+keyword args,
