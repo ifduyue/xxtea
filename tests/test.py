@@ -384,6 +384,22 @@ class TestArgPassing(unittest.TestCase):
         with self.assertRaises(TypeError):
             xxtea.decrypt(self.enc, self.key, rounds=1.5)
 
+    def test_rounds_overflow(self):
+        # overflow — keyword
+        with self.assertRaises(OverflowError):
+            xxtea.encrypt(self.data, self.key, rounds=2**32)
+        with self.assertRaises(OverflowError):
+            xxtea.decrypt(self.enc, self.key, rounds=2**32)
+        with self.assertRaises(OverflowError):
+            xxtea.encrypt_hex(self.data, self.key, rounds=2**32)
+        with self.assertRaises(OverflowError):
+            xxtea.decrypt_hex(self.hexenc, self.key, rounds=2**32)
+        # overflow — positional
+        with self.assertRaises(OverflowError):
+            xxtea.encrypt(self.data, self.key, True, 2**32)
+        with self.assertRaises(OverflowError):
+            xxtea.decrypt(self.enc, self.key, True, 2**32)
+
 
 if __name__ == '__main__':
     unittest.main()
