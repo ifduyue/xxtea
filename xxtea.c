@@ -168,7 +168,191 @@ static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
  * Module Functions ***********************************************************
  ****************************************************************************/
 
-static char *keywords[] = {"data", "key", "padding", "rounds", NULL};
+/*
+ * Look up an argument that may be positional (index < nargs) or keyword.
+ * Returns the PyObject* value, or NULL if not found.
+ */
+static PyObject *
+_get_arg(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
+         Py_ssize_t pos, const char *name)
+{
+    if (pos < nargs) {
+        return args[pos];
+    }
+    if (kwnames != NULL) {
+        Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
+        for (Py_ssize_t i = 0; i < nkwargs; i++) {
+            if (PyUnicode_CompareWithASCIIString(
+                    PyTuple_GET_ITEM(kwnames, i), name) == 0) {
+                return args[nargs + i];
+            }
+        }
+    }
+    return NULL;
+}
+
+/*
+ * Keyword argument parsing helper for padding and rounds.
+ * Returns 0 on success, -1 on error with exception set.
+ */
+static int
+_parse_kwargs(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
+              int *padding, unsigned int *rounds)
+{
+    if (kwnames == NULL) {
+        return 0;
+    }
+
+    Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
+    for (Py_ssize_t i = 0; i < nkwargs; i++) {
+        PyObject *name = PyTuple_GET_ITEM(kwnames, i);
+        PyObject *value = args[nargs + i];
+
+        /* Skip required positional args that may appear as keywords */
+        if (PyUnicode_CompareWithASCIIString(name, "data") == 0 ||
+            PyUnicode_CompareWithASCIIString(name, "key") == 0) {
+            continue;
+        }
+
+        if (PyUnicode_CompareWithASCIIString(name, "padding") == 0) {
+            *padding = PyObject_IsTrue(value) ? 1 : 0;
+        }
+        else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
+            unsigned long val = PyLong_AsUnsignedLong(value);
+            if (val == (unsigned long)-1 && PyErr_Occurred()) {
+                return -1;
+            }
+            *rounds = (unsigned int)val;
+        }
+        else {
+            PyErr_Format(PyExc_TypeError,
+                "'%U' is an invalid keyword argument", name);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Internal encrypt implementation — takes raw buffers, returns PyBytes or NULL.
+ */
+static inline PyObject *
+_encrypt_impl(const char *data_buf, Py_ssize_t data_len,
+              const char *key_buf, int padding, unsigned int rounds)
+{
+    int alen;
+    PyObject *retval;
+    char *retbuf;
+    unsigned int *d, k[4];
+
+    d = NULL;
+    k[0] = k[1] = k[2] = k[3] = 0;
+    retval = NULL;
+
+    if (!padding && (data_len < 8 || (data_len & 3) != 0)) {
+        PyErr_SetString(PyExc_ValueError,
+            "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
+        return NULL;
+    }
+
+    alen = data_len < 4 ? 2 : (data_len >> 2) + padding;
+    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
+
+    if (d == NULL) {
+        return PyErr_NoMemory();
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    bytes2longs(data_buf, data_len, d, padding);
+    bytes2longs(key_buf, 16, k, 0);
+    btea(d, alen, k, rounds);
+    Py_END_ALLOW_THREADS
+
+    retval = PyBytes_FromStringAndSize(NULL, alen << 2);
+
+    if (!retval) {
+        free(d);
+        return NULL;
+    }
+
+    retbuf = PyBytes_AsString(retval);
+    longs2bytes(d, alen, retbuf, 0);
+
+    free(d);
+    return retval;
+}
+
+/*
+ * Internal decrypt implementation — takes raw buffers, returns PyBytes or NULL.
+ */
+static inline PyObject *
+_decrypt_impl(const char *data_buf, Py_ssize_t data_len,
+              const char *key_buf, int padding, unsigned int rounds)
+{
+    int alen, rc;
+    PyObject *retval;
+    char *retbuf;
+    unsigned int *d, k[4];
+
+    d = NULL;
+    k[0] = k[1] = k[2] = k[3] = 0;
+    retval = NULL;
+
+    if (!padding && (data_len < 8 || (data_len & 3))) {
+        PyErr_SetString(PyExc_ValueError,
+            "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
+        return NULL;
+    }
+
+    retval = PyBytes_FromStringAndSize(NULL, data_len);
+
+    if (!retval) {
+        return NULL;
+    }
+
+    retbuf = PyBytes_AsString(retval);
+
+    /* not divided by 4, or length < 8 */
+    if (data_len & 3 || data_len < 8) {
+        PyErr_SetString(PyExc_ValueError,
+            "Invalid data, data length is not a multiple of 4, or less than 8.");
+        Py_DECREF(retval);
+        return NULL;
+    }
+
+    alen = data_len / 4;
+    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
+
+    if (d == NULL) {
+        Py_DECREF(retval);
+        return PyErr_NoMemory();
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    bytes2longs(data_buf, data_len, d, 0);
+    bytes2longs(key_buf, 16, k, 0);
+    btea(d, -alen, k, rounds);
+    rc = longs2bytes(d, alen, retbuf, padding);
+    Py_END_ALLOW_THREADS
+
+    if (padding) {
+        if (rc >= 0) {
+            /* Remove PKCS#7 padded chars */
+            Py_SET_SIZE(retval, rc);
+        }
+        else {
+            /* Illegal PKCS#7 padding */
+            PyErr_SetString(PyExc_ValueError,
+                "Invalid data, illegal PKCS#7 padding. Could be using a wrong key.");
+            Py_DECREF(retval);
+            retval = NULL;
+        }
+    }
+
+    free(d);
+    return retval;
+}
 
 
 PyDoc_STRVAR(
@@ -176,89 +360,109 @@ PyDoc_STRVAR(
     "encrypt (data, key, padding=True, rounds=0)\n\n"
     "Encrypt `data` with a 16-byte `key`, return binary bytes.");
 
-static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
+static PyObject *
+xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    int alen, dlen, klen, padding;
+    Py_buffer data = {NULL};
+    Py_buffer key = {NULL};
     PyObject *retval;
-    char *retbuf;
-    unsigned int *d, k[4], rounds;
-    Py_buffer data, key;
+    int padding = 1;
+    unsigned int rounds = 0;
 
-    d = NULL;
-    retval = NULL;
-    k[0] = k[1] = k[2] = k[3] = 0;
-    padding = 1;
-    rounds = 0;
-    data.buf = data.obj = key.buf = key.obj = NULL;
+    PyObject *data_obj, *key_obj;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s*s*|iI", keywords, &data, &key, &padding, &rounds)) {
+    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
+    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
+
+    if (!data_obj || !key_obj) {
+        PyErr_Format(PyExc_TypeError,
+            "encrypt() missing required arguments: 'data' and 'key'");
         return NULL;
     }
-    padding = padding != 0 ? 1 : 0;
-    dlen = data.len;
-    klen = key.len;
 
+    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0) {
+        return NULL;
+    }
+    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
+        PyBuffer_Release(&data);
+        return NULL;
+    }
 
-    if (klen != 16) {
+    if (key.len != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        goto cleanup;
+        PyBuffer_Release(&data);
+        PyBuffer_Release(&key);
+        return NULL;
     }
 
-    if (!padding && (dlen < 8 || (dlen & 3) != 0)) {
-        PyErr_SetString(PyExc_ValueError, "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
-        goto cleanup;
+    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
+        PyBuffer_Release(&data);
+        PyBuffer_Release(&key);
+        return NULL;
     }
 
-    alen = dlen < 4 ? 2 : (dlen >> 2) + padding;
-    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
-
-    if (d == NULL) {
-        PyErr_NoMemory();
-        goto cleanup;
-    }
-
-    Py_BEGIN_ALLOW_THREADS
-    bytes2longs(data.buf, dlen, d, padding);
-    bytes2longs(key.buf, klen, k, 0);
-    btea(d, alen, k, rounds);
-    Py_END_ALLOW_THREADS
+    retval = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
 
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
-
-    retval = PyBytes_FromStringAndSize(NULL, (alen << 2));
-
-    if (!retval) {
-        goto cleanup;
-    }
-
-    retbuf = PyBytes_AsString(retval);
-    longs2bytes(d, alen, retbuf, 0);
-
-    free(d);
 
     return retval;
-
-cleanup:
-    XFREE(d);
-    Py_XDECREF(retval);
-    PyBuffer_Release(&data);
-    PyBuffer_Release(&key);
-    return NULL;
 }
+
 
 PyDoc_STRVAR(
     xxtea_encrypt_hex_doc,
     "encrypt_hex (data, key, padding=True, rounds=0)\n\n"
     "Encrypt `data` with a 16-byte `key`, return hex encoded bytes.");
 
-static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
+static PyObject *
+xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    PyObject *retval, *tmp;
+    Py_buffer data = {NULL};
+    Py_buffer key = {NULL};
+    PyObject *tmp, *retval;
     xxtea_mod_state *module_state;
-    retval = tmp = NULL;
+    int padding = 1;
+    unsigned int rounds = 0;
 
-    if (!(tmp = xxtea_encrypt(self, args, kwargs))) {
+    PyObject *data_obj, *key_obj;
+
+    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
+    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
+
+    if (!data_obj || !key_obj) {
+        PyErr_Format(PyExc_TypeError,
+            "encrypt_hex() missing required arguments: 'data' and 'key'");
+        return NULL;
+    }
+
+    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0) {
+        return NULL;
+    }
+    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
+        PyBuffer_Release(&data);
+        return NULL;
+    }
+
+    if (key.len != 16) {
+        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
+        PyBuffer_Release(&data);
+        PyBuffer_Release(&key);
+        return NULL;
+    }
+
+    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
+        PyBuffer_Release(&data);
+        PyBuffer_Release(&key);
+        return NULL;
+    }
+
+    tmp = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
+
+    PyBuffer_Release(&data);
+    PyBuffer_Release(&key);
+
+    if (!tmp) {
         return NULL;
     }
 
@@ -269,133 +473,123 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
     return retval;
 }
 
+
 PyDoc_STRVAR(
     xxtea_decrypt_doc,
     "decrypt (data, key, padding=True, rounds=0)\n\n"
     "Decrypt `data` with a 16-byte `key`, return original bytes.");
 
-static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
+static PyObject *
+xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    int alen, dlen, klen, rc, padding;
+    Py_buffer data = {NULL};
+    Py_buffer key = {NULL};
     PyObject *retval;
-    char *retbuf;
-    unsigned int *d, k[4], rounds;
-    Py_buffer data, key;
+    int padding = 1;
+    unsigned int rounds = 0;
 
-    d = NULL;
-    retval = NULL;
-    k[0] = k[1] = k[2] = k[3] = 0;
-    padding = 1;
-    rounds = 0;
-    data.buf = data.obj = key.buf = key.obj = NULL;
+    PyObject *data_obj, *key_obj;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s*s*|iI", keywords, &data, &key, &padding, &rounds)) {
+    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
+    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
+
+    if (!data_obj || !key_obj) {
+        PyErr_Format(PyExc_TypeError,
+            "decrypt() missing required arguments: 'data' and 'key'");
         return NULL;
     }
-    padding = padding != 0 ? 1 : 0;
-    dlen = data.len;
-    klen = key.len;
 
+    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0) {
+        return NULL;
+    }
+    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
+        PyBuffer_Release(&data);
+        return NULL;
+    }
 
-    if (klen != 16) {
+    if (key.len != 16) {
         PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        goto cleanup;
+        PyBuffer_Release(&data);
+        PyBuffer_Release(&key);
+        return NULL;
     }
 
-    if (!padding && (dlen < 8 || dlen & 3)) {
-        PyErr_SetString(PyExc_ValueError, "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
-        goto cleanup;
+    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
+        PyBuffer_Release(&data);
+        PyBuffer_Release(&key);
+        return NULL;
     }
 
-    retval = PyBytes_FromStringAndSize(NULL, dlen);
-
-    if (!retval) {
-        goto cleanup;
-    }
-
-    retbuf = PyBytes_AsString(retval);
-
-    /* not divided by 4, or length < 8 */
-    if (dlen & 3 || dlen < 8) {
-        PyErr_SetString(PyExc_ValueError, "Invalid data, data length is not a multiple of 4, or less than 8.");
-        goto cleanup;
-    }
-
-    alen = dlen / 4;
-    d = (unsigned int *)calloc(alen, sizeof(unsigned int));
-
-    if (d == NULL) {
-        PyErr_NoMemory();
-        goto cleanup;
-
-    }
-
-    Py_BEGIN_ALLOW_THREADS
-    bytes2longs(data.buf, dlen, d, 0);
-    bytes2longs(key.buf, klen, k, 0);
-    btea(d, -alen, k, rounds);
-    rc = longs2bytes(d, alen, retbuf, padding);
-    Py_END_ALLOW_THREADS
+    retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
 
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
-
-    if (padding) {
-        if (rc >= 0) {
-            /* Remove PKCS#7 padded chars */
-            Py_SET_SIZE(retval, rc);
-        }
-        else {
-            /* Illegal PKCS#7 padding */
-            PyErr_SetString(PyExc_ValueError, "Invalid data, illegal PKCS#7 padding. Could be using a wrong key.");
-            goto cleanup;
-        }
-    }
-
-    free(d);
 
     return retval;
-
-cleanup:
-    XFREE(d);
-    Py_XDECREF(retval);
-    PyBuffer_Release(&data);
-    PyBuffer_Release(&key);
-    return NULL;
 }
+
 
 PyDoc_STRVAR(
     xxtea_decrypt_hex_doc,
     "decrypt_hex (data, key, padding = True)\n\n"
     "Decrypt hex encoded `data` with a 16-byte `key`, return original bytes.");
 
-static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
+static PyObject *
+xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    PyObject *data, *key, *padding, *rounds, *retval, *tmp;
+    PyObject *data_obj, *key_obj, *tmp = NULL, *retval = NULL;
+    Py_buffer data = {NULL};
+    Py_buffer key = {NULL};
     xxtea_mod_state *module_state;
+    int padding = 1;
+    unsigned int rounds = 0;
 
-    data = key = retval = tmp = NULL;
-    padding = Py_BuildValue("i", 1);
-    rounds = Py_BuildValue("I", 0);
+    data_obj = _get_arg(args, nargs, kwnames, 0, "data");
+    key_obj = _get_arg(args, nargs, kwnames, 1, "key");
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "SS|OO", keywords, &data, &key, &padding, &rounds)) {
-        goto cleanup;
+    if (!data_obj || !key_obj) {
+        PyErr_Format(PyExc_TypeError,
+            "decrypt_hex() missing required arguments: 'data' and 'key'");
+        return NULL;
+    }
+
+    if (_parse_kwargs(args, nargs, kwnames, &padding, &rounds) < 0) {
+        return NULL;
     }
 
     module_state = (xxtea_mod_state*)PyModule_GetState(self);
-    if (!(tmp = PyObject_CallOneArg(module_state->binascii_unhexlify, data))) {
-        goto cleanup;
+
+    /* Unhexlify hex string to bytes */
+    if (!(tmp = PyObject_CallOneArg(module_state->binascii_unhexlify, data_obj))) {
+        return NULL;
     }
 
-    retval = PyObject_CallMethod(self, "decrypt", "(OOOO)", tmp, key, padding, rounds, NULL);
+    /* Get buffers from unhexlified data and key */
+    if (PyObject_GetBuffer(tmp, &data, PyBUF_SIMPLE) < 0) {
+        Py_DECREF(tmp);
+        return NULL;
+    }
+    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
+        PyBuffer_Release(&data);
+        Py_DECREF(tmp);
+        return NULL;
+    }
+
+    if (key.len != 16) {
+        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
+        PyBuffer_Release(&data);
+        PyBuffer_Release(&key);
+        Py_DECREF(tmp);
+        return NULL;
+    }
+
+    retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
+
+    PyBuffer_Release(&data);
+    PyBuffer_Release(&key);
     Py_DECREF(tmp);
 
     return retval;
-
-cleanup:
-    Py_DECREF(padding);
-    Py_DECREF(rounds);
-    return NULL;
 }
 
 /*****************************************************************************
@@ -445,10 +639,10 @@ static int _exec(PyObject *module)
 }
 
 static PyMethodDef methods[] = {
-    {"encrypt", (PyCFunction)xxtea_encrypt, METH_VARARGS | METH_KEYWORDS, xxtea_encrypt_doc},
-    {"decrypt", (PyCFunction)xxtea_decrypt, METH_VARARGS | METH_KEYWORDS, xxtea_decrypt_doc},
-    {"encrypt_hex", (PyCFunction)xxtea_encrypt_hex, METH_VARARGS | METH_KEYWORDS, xxtea_encrypt_hex_doc},
-    {"decrypt_hex", (PyCFunction)xxtea_decrypt_hex, METH_VARARGS | METH_KEYWORDS, xxtea_decrypt_hex_doc},
+    {"encrypt", (PyCFunction)xxtea_encrypt, METH_FASTCALL | METH_KEYWORDS, xxtea_encrypt_doc},
+    {"decrypt", (PyCFunction)xxtea_decrypt, METH_FASTCALL | METH_KEYWORDS, xxtea_decrypt_doc},
+    {"encrypt_hex", (PyCFunction)xxtea_encrypt_hex, METH_FASTCALL | METH_KEYWORDS, xxtea_encrypt_hex_doc},
+    {"decrypt_hex", (PyCFunction)xxtea_decrypt_hex, METH_FASTCALL | METH_KEYWORDS, xxtea_decrypt_hex_doc},
     {NULL, NULL, 0, NULL}
 };
 
