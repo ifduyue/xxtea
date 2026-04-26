@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define VERSION "4.0.0.dev1"
+#define VERSION "4.0.0b1"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
