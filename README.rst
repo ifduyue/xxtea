@@ -129,6 +129,8 @@ where n denotes how many 32-bit integers the input data can fit in.
 We can change this by setting ``rounds`` parameter.
 
 Do note that the more rounds it is, the more time will be consumed.
+``rounds`` must fit in a 32-bit unsigned integer; values exceeding
+``2**32 - 1`` raise ``OverflowError``.
 
 .. code-block:: python
 
@@ -177,3 +179,5 @@ is raised:
     TypeError : Odd-length string
     >>> try_catch(xxtea.decrypt_hex, 'abcd', key=' '*16)
     ValueError : Invalid data, data length is not a multiple of 4, or less than 8.
+    >>> try_catch(xxtea.encrypt, b'x', b'k'*16, rounds=2**32)
+    OverflowError : rounds value too large
