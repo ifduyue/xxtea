@@ -135,9 +135,19 @@ class TestArgPassing(unittest.TestCase):
 
     # ── helpers ──────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _rounds_from_args(args, kwargs):
+        """Extract rounds from positional or keyword args."""
+        if 'rounds' in kwargs:
+            return kwargs['rounds']
+        # rounds is the 4th positional arg (index 3)
+        if len(args) > 3:
+            return args[3]
+        return 0
+
     def _try_encrypt(self, *args, **kwargs):
         """Call encrypt and verify by decrypting with the same key+rounds."""
-        rounds = kwargs.get('rounds', 0)
+        rounds = self._rounds_from_args(args, kwargs)
         enc = xxtea.encrypt(*args, **kwargs)
         dec = xxtea.decrypt(enc, self.key, rounds=rounds)
         self.assertEqual(dec, self.data)
@@ -146,7 +156,7 @@ class TestArgPassing(unittest.TestCase):
     def _try_decrypt(self, *args, **kwargs):
         """Call decrypt and verify result.
         Re-encrypts self.data with the same parameters first so rounds match."""
-        rounds = kwargs.get('rounds', 0)
+        rounds = self._rounds_from_args(args, kwargs)
         padding = kwargs.get('padding', True)
         enc = xxtea.encrypt(self.data, self.key, padding=padding, rounds=rounds)
         dec = xxtea.decrypt(enc, *args[1:], **{k: v for k, v in kwargs.items() if k != 'data'})
@@ -154,7 +164,7 @@ class TestArgPassing(unittest.TestCase):
 
     def _try_encrypt_hex(self, *args, **kwargs):
         """Call encrypt_hex and verify by decrypting with the same key+rounds."""
-        rounds = kwargs.get('rounds', 0)
+        rounds = self._rounds_from_args(args, kwargs)
         hexenc = xxtea.encrypt_hex(*args, **kwargs)
         dec = xxtea.decrypt_hex(hexenc, self.key, rounds=rounds)
         self.assertEqual(dec, self.data)
@@ -162,7 +172,7 @@ class TestArgPassing(unittest.TestCase):
     def _try_decrypt_hex(self, *args, **kwargs):
         """Call decrypt_hex and verify result.
         Re-encrypts self.data with the same parameters first so rounds match."""
-        rounds = kwargs.get('rounds', 0)
+        rounds = self._rounds_from_args(args, kwargs)
         padding = kwargs.get('padding', True)
         hexenc = xxtea.encrypt_hex(self.data, self.key, padding=padding, rounds=rounds)
         dec = xxtea.decrypt_hex(hexenc, *args[1:], **{k: v for k, v in kwargs.items() if k != 'data'})
@@ -196,6 +206,31 @@ class TestArgPassing(unittest.TestCase):
 
     def test_encrypt_both_optional_keyword(self):
         self._try_encrypt(self.data, self.key, padding=True, rounds=32)
+
+    def test_encrypt_positional_padding_rounds(self):
+        """Regression: positional padding/rounds must work."""
+        enc_pos = xxtea.encrypt(self.data, self.key, True, 32)
+        enc_kw  = xxtea.encrypt(self.data, self.key, padding=True, rounds=32)
+        self.assertEqual(enc_pos, enc_kw)
+        dec = xxtea.decrypt(enc_pos, self.key, True, 32)
+        self.assertEqual(dec, self.data)
+        # Verify round-trip: positional encrypt with helper (uses keyword)
+        dec2 = xxtea.decrypt(enc_pos, self.key, rounds=32)
+        self.assertEqual(dec2, self.data)
+
+    def test_decrypt_positional_padding_rounds(self):
+        """Regression: positional padding/rounds must work."""
+        enc = xxtea.encrypt(self.data, self.key, True, 32)
+        dec = xxtea.decrypt(enc, self.key, True, 32)
+        self.assertEqual(dec, self.data)
+
+    def test_positional_padding_only(self):
+        """Regression: positional False at position 2."""
+        enc_pos = xxtea.encrypt(self.data, self.key, False)
+        enc_kw  = xxtea.encrypt(self.data, self.key, padding=False)
+        self.assertEqual(enc_pos, enc_kw)
+        dec = xxtea.decrypt(enc_pos, self.key, False)
+        self.assertEqual(dec, self.data)
 
     def test_encrypt_nopadding_keyword(self):
         enc = xxtea.encrypt(self.data, self.key, padding=False)
