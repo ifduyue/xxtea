@@ -45,13 +45,13 @@ typedef struct xxtea_mod_state {
     PyObject *binascii_unhexlify;
 } xxtea_mod_state;
 
-static void btea(uint32_t *v, int n, uint32_t const key[4], unsigned int rounds)
+static inline void btea(uint32_t *v, int n, uint32_t const key[4], unsigned int rounds)
 {
     uint32_t y, z, sum;
     unsigned p, e;
 
     if (n > 1) {          /* Coding Part */
-        rounds = rounds == 0 ? 6 + 52 / n: rounds;
+        rounds = rounds == 0 ? (unsigned)(6 + 52 / n) : rounds;
         sum = 0;
         z = v[n - 1];
 
@@ -71,7 +71,7 @@ static void btea(uint32_t *v, int n, uint32_t const key[4], unsigned int rounds)
     }
     else if (n < -1) {    /* Decoding Part */
         n = -n;
-        rounds = rounds == 0 ? 6 + 52 / n: rounds;
+        rounds = rounds == 0 ? (unsigned)(6 + 52 / n) : rounds;
         sum = (uint32_t)(rounds * DELTA);
         y = v[0];
 
@@ -188,7 +188,7 @@ static Py_ssize_t longs2bytes(uint32_t *in, Py_ssize_t inlen, char *out, int pad
 /*
  * Parse all arguments in a single pass.  Returns 0 on success, -1 on error.
  */
-static int
+static inline int
 _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
             PyObject **data_obj, PyObject **key_obj,
             int *padding, unsigned int *rounds)
@@ -289,7 +289,7 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
 }
 
 /* Acquire buffers and validate key length. Returns 0 on success, -1 on error. */
-static int
+static inline int
 _get_buffers(PyObject *data_obj, PyObject *key_obj,
              Py_buffer *data, Py_buffer *key)
 {
@@ -526,28 +526,14 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
     if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
 
-    /* Unhexlify hex string to bytes */
+    /* Unhexlify hex string to bytes, then use shared buffer helper */
     PyObject *tmp = PyObject_CallOneArg(
         ((xxtea_mod_state*)PyModule_GetState(self))->binascii_unhexlify,
         data_obj);
     if (!tmp)
         return NULL;
 
-    /* Get buffers from unhexlified data and key */
-    if (PyObject_GetBuffer(tmp, &data, PyBUF_SIMPLE) < 0) {
-        Py_DECREF(tmp);
-        return NULL;
-    }
-    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
-        PyBuffer_Release(&data);
-        Py_DECREF(tmp);
-        return NULL;
-    }
-
-    if (key.len != 16) {
-        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        PyBuffer_Release(&data);
-        PyBuffer_Release(&key);
+    if (_get_buffers(tmp, key_obj, &data, &key) < 0) {
         Py_DECREF(tmp);
         return NULL;
     }
