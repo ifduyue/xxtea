@@ -22,8 +22,8 @@ xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-bad
     :alt: CodSpeed
 
 .. _XXTEA: http://en.wikipedia.org/wiki/XXTEA
-.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L130
-.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L102
+.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L140
+.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L98
 .. _PKCS#7: http://en.wikipedia.org/wiki/Padding_%28cryptography%29#PKCS7
 
 XXTEA_ implemented as a Python extension module, licensed under 2-clause BSD.
@@ -151,12 +151,11 @@ Do note that the more rounds it is, the more time will be consumed.
 Catching Exceptions
 ---------------------
 
-When calling ``decrypt()`` and ``decrypt_hex()``, it is possible that a ``ValueError`` or a ``TypeError``
-is raised:
+When calling these functions, a ``ValueError``, ``TypeError``, or ``OverflowError``
+may be raised:
 
 .. code-block:: python
 
-    >>> from __future__ import print_function
     >>> import xxtea
     >>>
     >>> def try_catch(func, *args, **kwargs):

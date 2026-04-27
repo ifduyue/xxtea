@@ -542,7 +542,7 @@ xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 
 PyDoc_STRVAR(
     xxtea_decrypt_hex_doc,
-    "decrypt_hex (data, key, padding = True)\n\n"
+    "decrypt_hex (data, key, padding=True)\n\n"
     "Decrypt hex encoded `data` with a 16-byte `key`, return original bytes.");
 
 static PyObject *
