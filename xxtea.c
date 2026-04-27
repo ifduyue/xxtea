@@ -299,14 +299,9 @@ static inline PyObject *
 _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
               const char *key_buf, int padding, unsigned int rounds)
 {
-    Py_ssize_t alen;
-    PyObject *retval;
-    char *retbuf;
-    uint32_t *d, k[4];
-
-    d = NULL;
-    k[0] = k[1] = k[2] = k[3] = 0;
-    retval = NULL;
+    uint32_t *d = NULL;
+    uint32_t k[4] = {0};
+    PyObject *retval = NULL;
 
     if (!padding && (data_len < 8 || (data_len & 3) != 0)) {
         PyErr_SetString(PyExc_ValueError,
@@ -314,7 +309,7 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
-    alen = data_len < 4 ? 2 : (data_len >> 2) + padding;
+    Py_ssize_t alen = data_len < 4 ? 2 : (data_len >> 2) + padding;
     if (alen > INT_MAX) {
         PyErr_SetString(PyExc_OverflowError, "data too large");
         return NULL;
@@ -338,7 +333,7 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
-    retbuf = PyBytes_AsString(retval);
+    char *retbuf = PyBytes_AsString(retval);
     longs2bytes(d, alen, retbuf, 0);
 
     free(d);
@@ -352,14 +347,8 @@ static inline PyObject *
 _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
               const char *key_buf, int padding, unsigned int rounds)
 {
-    Py_ssize_t alen, rc;
-    PyObject *retval;
-    char *retbuf;
-    uint32_t *d, k[4];
-
-    d = NULL;
-    k[0] = k[1] = k[2] = k[3] = 0;
-    retval = NULL;
+    uint32_t *d = NULL;
+    uint32_t k[4] = {0};
 
     if (!padding && (data_len < 8 || (data_len & 3))) {
         PyErr_SetString(PyExc_ValueError,
@@ -367,13 +356,13 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
-    retval = PyBytes_FromStringAndSize(NULL, data_len);
+    PyObject *retval = PyBytes_FromStringAndSize(NULL, data_len);
 
     if (!retval) {
         return NULL;
     }
 
-    retbuf = PyBytes_AsString(retval);
+    char *retbuf = PyBytes_AsString(retval);
 
     /* not divided by 4, or length < 8 */
     if (data_len & 3 || data_len < 8) {
@@ -383,7 +372,7 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
-    alen = data_len / 4;
+    Py_ssize_t alen = data_len / 4;
     if (alen > INT_MAX) {
         PyErr_SetString(PyExc_OverflowError, "data too large");
         Py_DECREF(retval);
@@ -396,6 +385,7 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return PyErr_NoMemory();
     }
 
+    Py_ssize_t rc;
     Py_BEGIN_ALLOW_THREADS
     bytes2longs(data_buf, data_len, d, 0);
     bytes2longs(key_buf, 16, k, 0);
@@ -431,7 +421,7 @@ static PyObject *
 xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
     Py_buffer data = {NULL}, key = {NULL};
-    PyObject *data_obj, *key_obj, *retval;
+    PyObject *data_obj, *key_obj;
     int padding;
     unsigned int rounds;
 
@@ -452,7 +442,7 @@ xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
         return NULL;
     }
 
-    retval = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
+    PyObject *retval = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
     return retval;
@@ -468,7 +458,7 @@ static PyObject *
 xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
     Py_buffer data = {NULL}, key = {NULL};
-    PyObject *data_obj, *key_obj, *tmp, *retval;
+    PyObject *data_obj, *key_obj;
     int padding;
     unsigned int rounds;
 
@@ -489,14 +479,14 @@ xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
         return NULL;
     }
 
-    tmp = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
+    PyObject *tmp = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
 
     if (!tmp)
         return NULL;
 
-    retval = PyObject_CallOneArg(
+    PyObject *retval = PyObject_CallOneArg(
         ((xxtea_mod_state*)PyModule_GetState(self))->binascii_hexlify, tmp);
     Py_DECREF(tmp);
     return retval;
@@ -512,7 +502,7 @@ static PyObject *
 xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
     Py_buffer data = {NULL}, key = {NULL};
-    PyObject *data_obj, *key_obj, *retval;
+    PyObject *data_obj, *key_obj;
     int padding;
     unsigned int rounds;
 
@@ -533,7 +523,7 @@ xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
         return NULL;
     }
 
-    retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
+    PyObject *retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
     return retval;
@@ -549,7 +539,7 @@ static PyObject *
 xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
     Py_buffer data = {NULL}, key = {NULL};
-    PyObject *data_obj, *key_obj, *tmp = NULL, *retval = NULL;
+    PyObject *data_obj, *key_obj;
     int padding;
     unsigned int rounds;
 
@@ -557,9 +547,10 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
         return NULL;
 
     /* Unhexlify hex string to bytes */
-    if (!(tmp = PyObject_CallOneArg(
-            ((xxtea_mod_state*)PyModule_GetState(self))->binascii_unhexlify,
-            data_obj)))
+    PyObject *tmp = PyObject_CallOneArg(
+        ((xxtea_mod_state*)PyModule_GetState(self))->binascii_unhexlify,
+        data_obj);
+    if (!tmp)
         return NULL;
 
     /* Get buffers from unhexlified data and key */
@@ -581,7 +572,7 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
         return NULL;
     }
 
-    retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
+    PyObject *retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
     PyBuffer_Release(&data);
     PyBuffer_Release(&key);
     Py_DECREF(tmp);
