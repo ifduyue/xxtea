@@ -26,9 +26,7 @@
 
 
 #include <Python.h>
-#include <ctype.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #define VERSION "4.0.0"
@@ -38,8 +36,6 @@ static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
 { ob->ob_size = size; }
 #define Py_SET_SIZE(ob, size) _Py_SET_SIZE((PyVarObject*)(ob), size)
 #endif
-
-#define XFREE(o) do { if ((o) != NULL) free(o); } while (0)
 
 #define DELTA 0x9e3779b9U
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
@@ -292,6 +288,26 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
     return 0;
 }
 
+/* Acquire buffers and validate key length. Returns 0 on success, -1 on error. */
+static int
+_get_buffers(PyObject *data_obj, PyObject *key_obj,
+             Py_buffer *data, Py_buffer *key)
+{
+    if (PyObject_GetBuffer(data_obj, data, PyBUF_SIMPLE) < 0)
+        return -1;
+    if (PyObject_GetBuffer(key_obj, key, PyBUF_SIMPLE) < 0) {
+        PyBuffer_Release(data);
+        return -1;
+    }
+    if (key->len != 16) {
+        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
+        PyBuffer_Release(data);
+        PyBuffer_Release(key);
+        return -1;
+    }
+    return 0;
+}
+
 /*
  * Internal encrypt implementation — takes raw buffers, returns PyBytes or NULL.
  */
@@ -427,20 +443,8 @@ xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 
     if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
-
-    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0)
+    if (_get_buffers(data_obj, key_obj, &data, &key) < 0)
         return NULL;
-    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
-        PyBuffer_Release(&data);
-        return NULL;
-    }
-
-    if (key.len != 16) {
-        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        PyBuffer_Release(&data);
-        PyBuffer_Release(&key);
-        return NULL;
-    }
 
     PyObject *retval = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
     PyBuffer_Release(&data);
@@ -464,20 +468,8 @@ xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
 
     if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
-
-    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0)
+    if (_get_buffers(data_obj, key_obj, &data, &key) < 0)
         return NULL;
-    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
-        PyBuffer_Release(&data);
-        return NULL;
-    }
-
-    if (key.len != 16) {
-        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        PyBuffer_Release(&data);
-        PyBuffer_Release(&key);
-        return NULL;
-    }
 
     PyObject *tmp = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
     PyBuffer_Release(&data);
@@ -508,20 +500,8 @@ xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 
     if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
-
-    if (PyObject_GetBuffer(data_obj, &data, PyBUF_SIMPLE) < 0)
+    if (_get_buffers(data_obj, key_obj, &data, &key) < 0)
         return NULL;
-    if (PyObject_GetBuffer(key_obj, &key, PyBUF_SIMPLE) < 0) {
-        PyBuffer_Release(&data);
-        return NULL;
-    }
-
-    if (key.len != 16) {
-        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
-        PyBuffer_Release(&data);
-        PyBuffer_Release(&key);
-        return NULL;
-    }
 
     PyObject *retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
     PyBuffer_Release(&data);
@@ -583,17 +563,12 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
  * Module Init ****************************************************************
  ****************************************************************************/
 
-/* ref: https://docs.python.org/2/howto/cporting.html */
-
-
 static int _exec(PyObject *module)
 {
     xxtea_mod_state *state = (xxtea_mod_state*)PyModule_GetState(module);
-    if (state == NULL) {
+    if (state == NULL)
         return -1;
-    }
 
-    int err = 0;
     PyObject *binascii = PyImport_ImportModule("binascii");
     if (!binascii) {
         PyErr_SetString(PyExc_ImportError, "Failed to import binascii module");
@@ -604,24 +579,15 @@ static int _exec(PyObject *module)
     state->binascii_unhexlify = PyObject_GetAttrString(binascii, "unhexlify");
     Py_DECREF(binascii);
 
-    if (!state->binascii_hexlify) {
-        PyErr_SetString(PyExc_AttributeError, "Failed to get binascii.hexlify");
-        err = 2;
-    }
-    if (!state->binascii_hexlify) {
-        PyErr_SetString(PyExc_AttributeError, "Failed to get binascii.hexlify");
-        err = 3;
-    }
-
-    if (err) {
+    if (!state->binascii_hexlify || !state->binascii_unhexlify) {
         Py_XDECREF(state->binascii_hexlify);
         Py_XDECREF(state->binascii_unhexlify);
-        return -err;
-
+        PyErr_SetString(PyExc_AttributeError,
+            "Failed to get binascii.hexlify or binascii.unhexlify");
+        return -1;
     }
 
     PyModule_AddStringConstant(module, "VERSION", VERSION);
-
     return 0;
 }
 
