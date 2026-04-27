@@ -1,15 +1,17 @@
 CHANGELOG
 --------------
 
-4.0.0b1 2026/04/26
+v4.0.0 2026/04/27
 ~~~~~~~~~~~~~~~~~~~
 
-- Drop Python 3.8 support
-- Performance improvement: at least 10%, up to 53% faster by using fastcall, internal _encrypt_impl/_decrypt_impl called directly, bytes2longs / longs2bytes use memcpy on little-endian for 4-byte word copies, etc.
-- alen, rc, inlen changed from int to Py_ssize_t to avoid overflow on 64-bit
-- OverflowError for data > ~8 GiB and rounds > 2**32 - 1
-- Proper handling of excess positional args, duplicate pos+keyword args,
-  unknown keywords, missing required args
+- Use vectorcall calling convention, up to 53% faster for small data
+- Optimize bytes-to-words conversion with memcpy for large data
+- Use uint32_t consistently in crypto code
+- Fix integer overflow for data larger than 2 GiB, add guard at ~8 GiB
+- Guard rounds value against silent truncation, cap at 2**32 - 1
+- Reject excess positional args, duplicate arguments, and unknown keywords
+- Check PyObject_IsTrue error return in padding parsing
+- Drop support for Python 3.8
 
 v3.8.0 2026/04/19
 ~~~~~~~~~~~~~~~~~~~
