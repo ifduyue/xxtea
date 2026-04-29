@@ -22,8 +22,8 @@ xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-bad
     :alt: CodSpeed
 
 .. _XXTEA: http://en.wikipedia.org/wiki/XXTEA
-.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L140
-.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L98
+.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L136
+.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L94
 .. _PKCS#7: http://en.wikipedia.org/wiki/Padding_%28cryptography%29#PKCS7
 
 XXTEA_ implemented as a Python extension module, licensed under 2-clause BSD.
