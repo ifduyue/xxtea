@@ -12,4 +12,4 @@ build-frontend = "build"
 
 [[tool.cibuildwheel.overrides]]
 select = "*-ios*"
-build-frontend = "build"
+build-frontend = { name = "build", args = ["--no-isolation"] }
