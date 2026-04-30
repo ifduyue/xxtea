@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "5.0.0a1"
+#define VERSION "5.0.0a2"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
@@ -371,17 +371,16 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
-    PyObject *retval = PyBytes_FromStringAndSize(NULL, data_len);
-
-    if (!retval) {
-        return NULL;
-    }
-
     /* not divided by 4, or length < 8 */
     if (data_len & 3 || data_len < 8) {
         PyErr_SetString(PyExc_ValueError,
             "Invalid data, data length is not a multiple of 4, or less than 8.");
-        Py_DECREF(retval);
+        return NULL;
+    }
+
+    PyObject *retval = PyBytes_FromStringAndSize(NULL, data_len);
+
+    if (!retval) {
         return NULL;
     }
 
@@ -721,7 +720,6 @@ static int _exec(PyObject *module)
 
     PyObject *binascii = PyImport_ImportModule("binascii");
     if (!binascii) {
-        PyErr_SetString(PyExc_ImportError, "Failed to import binascii module");
         return -1;
     }
 
@@ -737,11 +735,21 @@ static int _exec(PyObject *module)
         return -1;
     }
 
-    PyModule_AddStringConstant(module, "VERSION", VERSION);
+    if (PyModule_AddStringConstant(module, "VERSION", VERSION) < 0)
+        return -1;
 
     PyObject *xxtea_type = PyType_FromModuleAndSpec(module, &xxtea_type_spec, NULL);
     if (xxtea_type == NULL)
         return -1;
+
+    /* PEP 689 / gh-101696: Mark the type as immutable for subinterpreter
+     * safety.  Available since Python 3.12.  Without this flag types could
+     * be mutated from one subinterpreter while another uses them, leading
+     * to crashes or data corruption. */
+#if PY_VERSION_HEX >= 0x030c0000
+    ((PyTypeObject *)xxtea_type)->tp_flags |= Py_TPFLAGS_IMMUTABLETYPE;
+#endif
+
     if (PyDict_SetItemString(PyModule_GetDict(module), "XXTEA", xxtea_type) < 0) {
         Py_DECREF(xxtea_type);
         return -1;
@@ -761,6 +769,13 @@ static PyMethodDef methods[] = {
 
 static PyModuleDef_Slot slots[] = {
     {Py_mod_exec, _exec},
+#if PY_VERSION_HEX >= 0x030c0000
+    /* Subinterpreter + per-interpreter GIL support (3.12+).
+       Value 2 (PER_INTERPRETER_GIL_SUPPORTED) is required
+       because value 1 (SUPPORTED, the default) means "shared
+       GIL only", which _xxsubinterpreters rejects on 3.12. */
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
+#endif
 #ifdef Py_GIL_DISABLED
     {Py_mod_gil, Py_MOD_GIL_NOT_USED},
 #endif
