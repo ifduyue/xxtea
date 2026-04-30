@@ -365,16 +365,9 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
     uint32_t *d = NULL;
     uint32_t k[4] = {0};
 
-    if (!padding && (data_len < 8 || (data_len & 3))) {
-        PyErr_SetString(PyExc_ValueError,
-            "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
-        return NULL;
-    }
-
-    /* not divided by 4, or length < 8 */
     if (data_len & 3 || data_len < 8) {
         PyErr_SetString(PyExc_ValueError,
-            "Invalid data, data length is not a multiple of 4, or less than 8.");
+            "Data length must be a multiple of 4 bytes and must not be less than 8 bytes");
         return NULL;
     }
 
