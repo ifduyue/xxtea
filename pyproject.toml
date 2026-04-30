@@ -5,6 +5,9 @@ build-backend = "setuptools.build_meta"
 [tool.cibuildwheel]
 enable = ["cpython-freethreading", "pypy", "pypy-eol", "graalpy"]
 
+[tool.cibuildwheel]
+build-frontend = "build[uv]"
+
 [[tool.cibuildwheel.overrides]]
 select = "*-musllinux_{ppc64le,riscv64,s390x}"
 build-frontend = "build"
