@@ -22,8 +22,8 @@ xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-bad
     :alt: CodSpeed
 
 .. _XXTEA: http://en.wikipedia.org/wiki/XXTEA
-.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L140
-.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L98
+.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L136
+.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L94
 .. _PKCS#7: http://en.wikipedia.org/wiki/Padding_%28cryptography%29#PKCS7
 
 XXTEA_ implemented as a Python extension module, licensed under 2-clause BSD.
@@ -53,7 +53,8 @@ Usage
 -----------
 
 This module provides four functions: ``encrypt()``, ``decrypt()``,
-``encrypt_hex()``, and ``decrypt_hex()``.
+``encrypt_hex()``, and ``decrypt_hex()``, plus an ``XXTEA`` type for
+reusable cipher objects.
 
 .. code-block:: Python
 
@@ -77,6 +78,41 @@ This module provides four functions: ``encrypt()``, ``decrypt()``,
     >>>
     >>> binascii.hexlify(enc) == hexenc
     True
+
+
+XXTEA Type
+-----------
+
+The ``XXTEA`` type holds a 16-byte key, rounds, and padding setting,
+so you can encrypt and decrypt multiple times without passing them each call.
+
+.. code-block:: python
+
+    >>> from xxtea import XXTEA
+    >>>
+    >>> cipher = XXTEA(key, padding=False, rounds=128)
+    >>> cipher
+    <xxtea.XXTEA object at 0x...>
+    >>>
+    >>> enc = cipher.encrypt(b'12345678')
+    >>> cipher.decrypt(enc)
+    b'12345678'
+    >>>
+    >>> hexenc = cipher.encrypt_hex(b'12345678')
+    >>> cipher.decrypt_hex(hexenc)
+    b'12345678'
+
+``rounds`` defaults to ``0`` (auto), ``padding`` defaults to ``True``.
+``rounds=0`` means ``6 + 52 / n``, where n is the number of 32-bit words in the data.
+They are stored on the object and used by every ``encrypt()``, ``decrypt()``,
+``encrypt_hex()``, and ``decrypt_hex()`` call:
+
+.. code-block:: python
+
+    >>> c = XXTEA(key)                          # rounds=0, padding=True
+    >>> c = XXTEA(key, rounds=64)         # override rounds
+    >>> c = XXTEA(key, padding=False)     # disable padding
+    >>> c = XXTEA(key, padding=False, rounds=42)
 
 
 ``encrypt_hex()`` and ``decrypt_hex()`` operate on ciphertext in a hexadecimal
@@ -179,4 +215,8 @@ may be raised:
     >>> try_catch(xxtea.decrypt_hex, 'abcd', key=' '*16)
     ValueError : Invalid data, data length is not a multiple of 4, or less than 8.
     >>> try_catch(xxtea.encrypt, b'x', b'k'*16, rounds=2**32)
+    OverflowError : rounds value too large
+    >>> try_catch(XXTEA, key=b'short')
+    ValueError : Need a 16-byte key.
+    >>> try_catch(XXTEA, key=b'k'*16, rounds=2**32)
     OverflowError : rounds value too large
