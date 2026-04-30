@@ -697,7 +697,11 @@ static PyType_Slot xxtea_type_slots[] = {
 static PyType_Spec xxtea_type_spec = {
     .name = "xxtea.XXTEA",
     .basicsize = sizeof(xxtea_object),
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = Py_TPFLAGS_DEFAULT
+#if PY_VERSION_HEX >= 0x030c0000
+           | Py_TPFLAGS_IMMUTABLETYPE
+#endif
+           ,
     .slots = xxtea_type_slots,
 };
 
@@ -734,14 +738,6 @@ static int _exec(PyObject *module)
     PyObject *xxtea_type = PyType_FromModuleAndSpec(module, &xxtea_type_spec, NULL);
     if (xxtea_type == NULL)
         return -1;
-
-    /* PEP 689 / gh-101696: Mark the type as immutable for subinterpreter
-     * safety.  Available since Python 3.12.  Without this flag types could
-     * be mutated from one subinterpreter while another uses them, leading
-     * to crashes or data corruption. */
-#if PY_VERSION_HEX >= 0x030c0000
-    ((PyTypeObject *)xxtea_type)->tp_flags |= Py_TPFLAGS_IMMUTABLETYPE;
-#endif
 
     if (PyDict_SetItemString(PyModule_GetDict(module), "XXTEA", xxtea_type) < 0) {
         Py_DECREF(xxtea_type);
