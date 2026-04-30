@@ -1,6 +1,15 @@
 CHANGELOG
 --------------
 
+v5.0.0a1 2026/04/30
+~~~~~~~~~~~~~~~~~~~
+
+- Add :class:`XXTEA` type — reusable cipher object holding key, padding, and rounds.
+  ``encrypt()``, ``decrypt()``, ``encrypt_hex()``, and ``decrypt_hex()`` take only data,
+  using the stored settings.
+- Validate ``rounds`` is non-negative and fits in ``unsigned int`` (raises ``OverflowError``).
+- Use C99 designated initializers for ``PyModuleDef`` and ``PyType_Spec``.
+
 v4.0.0 2026/04/27
 ~~~~~~~~~~~~~~~~~~~
 

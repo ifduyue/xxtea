@@ -411,5 +411,184 @@ class TestArgPassing(unittest.TestCase):
             xxtea.decrypt(self.enc, self.key, True, 2**32)
 
 
+class TestXXTEAType(unittest.TestCase):
+    """Tests for the XXTEA type (cipher object)."""
+
+    data = b'How do you do?'
+    key = b'Fine. And you?  '
+    enc = b'x\xf4e\xeb\x1bI\x85\x88}\x11\x84.\xde\x856!'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cipher = xxtea.XXTEA(cls.key)
+
+    # ── basic round-trip ────────────────────────────────────────────────
+
+    def test_encrypt(self):
+        enc = self.cipher.encrypt(self.data)
+        self.assertEqual(enc, self.enc)
+
+    def test_decrypt(self):
+        data = self.cipher.decrypt(self.enc)
+        self.assertEqual(data, self.data)
+
+    def test_roundtrip(self):
+        enc = self.cipher.encrypt(self.data)
+        dec = self.cipher.decrypt(enc)
+        self.assertEqual(dec, self.data)
+
+    # ── random data ─────────────────────────────────────────────────────
+
+    def test_urandom(self):
+        for i in range(2048):
+            key = os.urandom(16)
+            data = os.urandom(i)
+            cipher = xxtea.XXTEA(key)
+
+            enc = cipher.encrypt(data)
+            dec = cipher.decrypt(enc)
+            self.assertEqual(data, dec)
+
+    def test_zero_bytes(self):
+        for i in range(2048):
+            data = b'\0' * i
+
+            key = os.urandom(16)
+            cipher = xxtea.XXTEA(key)
+            enc = cipher.encrypt(data)
+            dec = cipher.decrypt(enc)
+            self.assertEqual(data, dec)
+
+            cipher2 = xxtea.XXTEA(b'\0' * 16)
+            enc = cipher2.encrypt(data)
+            dec = cipher2.decrypt(enc)
+            self.assertEqual(data, dec)
+
+    # ── no-padding ──────────────────────────────────────────────────────
+
+    def test_encrypt_nopadding(self):
+        key = os.urandom(16)
+        cipher = xxtea.XXTEA(key, padding=False)
+        for i in (8, 12, 16, 20):
+            data = os.urandom(i)
+            enc = cipher.encrypt(data)
+            dec = cipher.decrypt(enc)
+            self.assertEqual(data, dec)
+
+    def test_encrypt_nopadding_zero(self):
+        key = os.urandom(16)
+        cipher = xxtea.XXTEA(key, padding=False)
+        for i in (8, 12, 16, 20):
+            data = b'\0' * i
+            enc = cipher.encrypt(data)
+            dec = cipher.decrypt(enc)
+            self.assertEqual(data, dec)
+
+    # ── rounds ──────────────────────────────────────────────────────────
+
+    def test_rounds(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+
+        for r in (0, 1, 8, 32, 64, 128, 256):
+            cipher = xxtea.XXTEA(key, rounds=r)
+            enc = cipher.encrypt(data)
+            dec = cipher.decrypt(enc)
+            self.assertEqual(data, dec)
+
+    def test_different_rounds_produce_different_output(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        c0 = xxtea.XXTEA(key, rounds=0)
+        c32 = xxtea.XXTEA(key, rounds=32)
+        self.assertNotEqual(c0.encrypt(data), c32.encrypt(data))
+
+    # ── matches module-level functions ──────────────────────────────────
+
+    def test_matches_module_encrypt(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        cipher = xxtea.XXTEA(key)
+        self.assertEqual(cipher.encrypt(data), xxtea.encrypt(data, key))
+
+    def test_matches_module_decrypt(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        enc = xxtea.encrypt(data, key)
+        cipher = xxtea.XXTEA(key)
+        self.assertEqual(cipher.decrypt(enc), xxtea.decrypt(enc, key))
+
+    def test_matches_module_with_rounds(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        cipher = xxtea.XXTEA(key, rounds=42)
+        enc_c = cipher.encrypt(data)
+        enc_m = xxtea.encrypt(data, key, rounds=42)
+        self.assertEqual(enc_c, enc_m)
+        self.assertEqual(cipher.decrypt(enc_m), xxtea.decrypt(enc_c, key, rounds=42))
+
+    def test_matches_module_nopadding(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        cipher = xxtea.XXTEA(key, padding=False)
+        enc_c = cipher.encrypt(data)
+        enc_m = xxtea.encrypt(data, key, padding=False)
+        self.assertEqual(enc_c, enc_m)
+
+    # ── error cases ─────────────────────────────────────────────────────
+
+    def test_short_key(self):
+        with self.assertRaises(ValueError):
+            xxtea.XXTEA(b'short')
+        with self.assertRaises(ValueError):
+            xxtea.XXTEA(b'this key is way too long!!!')
+
+    def test_rounds_overflow(self):
+        with self.assertRaises(OverflowError):
+            xxtea.XXTEA(self.key, rounds=2**32)
+
+    def test_missing_required_arg(self):
+        with self.assertRaises(TypeError):
+            xxtea.XXTEA()
+
+    def test_invalid_rounds_type(self):
+        with self.assertRaises(TypeError):
+            xxtea.XXTEA(self.key, rounds='not-an-int')
+
+
+    # ── hex methods ─────────────────────────────────────────────────────
+
+    def test_encrypt_hex(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        cipher = xxtea.XXTEA(key)
+        hexenc = cipher.encrypt_hex(data)
+        dec = cipher.decrypt_hex(hexenc)
+        self.assertEqual(dec, data)
+
+    def test_encrypt_hex_matches(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        cipher = xxtea.XXTEA(key)
+        self.assertEqual(cipher.encrypt_hex(data),
+                         xxtea.encrypt_hex(data, key))
+
+    def test_decrypt_hex_matches(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+        hexenc = xxtea.encrypt_hex(data, key)
+        cipher = xxtea.XXTEA(key)
+        self.assertEqual(cipher.decrypt_hex(hexenc),
+                         xxtea.decrypt_hex(hexenc, key))
+
+    # ── padding at construction ──────────────────────────────────────────
+
+    def test_padding_construction(self):
+        key = os.urandom(16)
+        for padding in (True, False):
+            cipher = xxtea.XXTEA(key, padding=padding)
+            self.assertEqual(cipher.decrypt(cipher.encrypt(b'12345678')), b'12345678')
+
+
 if __name__ == '__main__':
     unittest.main()

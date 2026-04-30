@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "4.0.0"
+#define VERSION "5.0.0a1"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
@@ -543,6 +543,173 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
 }
 
 /*****************************************************************************
+ * XXTEA Type ****************************************************************
+ ****************************************************************************/
+
+
+
+typedef struct {
+    PyObject_HEAD
+    char key[16];
+    unsigned int rounds;
+    int padding;
+} xxtea_object;
+
+static int
+xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
+{
+    static char *kwlist[] = {"key", "padding", "rounds", NULL};
+    Py_buffer key_buf = {NULL};
+    int padding = 1;
+    Py_ssize_t rounds = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|pn", kwlist,
+                                     &key_buf, &padding, &rounds))
+        return -1;
+
+    if (key_buf.len != 16) {
+        PyErr_SetString(PyExc_ValueError, "Need a 16-byte key.");
+        PyBuffer_Release(&key_buf);
+        return -1;
+    }
+
+    if (rounds < 0 || (size_t)rounds > UINT_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+        PyBuffer_Release(&key_buf);
+        return -1;
+    }
+
+    memcpy(self->key, key_buf.buf, 16);
+    self->rounds = (unsigned int)rounds;
+    self->padding = padding;
+    PyBuffer_Release(&key_buf);
+    return 0;
+}
+
+static void
+xxtea_object_dealloc(xxtea_object *self)
+{
+    PyTypeObject *tp = Py_TYPE(self);
+    tp->tp_free((PyObject *)self);
+    Py_DECREF(tp);
+}
+
+static PyObject *
+xxtea_object_encrypt(xxtea_object *self, PyObject *data_obj)
+{
+    Py_buffer data_buf = {NULL};
+
+    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
+        return NULL;
+
+    PyObject *retval = _encrypt_impl(data_buf.buf, data_buf.len,
+                                      self->key, self->padding, self->rounds);
+    PyBuffer_Release(&data_buf);
+    return retval;
+}
+
+static PyObject *
+xxtea_object_decrypt(xxtea_object *self, PyObject *data_obj)
+{
+    Py_buffer data_buf = {NULL};
+
+    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
+        return NULL;
+
+    PyObject *retval = _decrypt_impl(data_buf.buf, data_buf.len,
+                                      self->key, self->padding, self->rounds);
+    PyBuffer_Release(&data_buf);
+    return retval;
+}
+
+static PyObject *
+xxtea_object_encrypt_hex(xxtea_object *self, PyObject *data_obj)
+{
+    Py_buffer data_buf = {NULL};
+
+    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
+        return NULL;
+
+    PyObject *tmp = _encrypt_impl(data_buf.buf, data_buf.len,
+                                   self->key, self->padding, self->rounds);
+    PyBuffer_Release(&data_buf);
+    if (!tmp)
+        return NULL;
+
+    xxtea_mod_state *state = PyType_GetModuleState(Py_TYPE(self));
+    if (!state || !state->binascii_hexlify) {
+        Py_DECREF(tmp);
+        PyErr_SetString(PyExc_RuntimeError, "module state not available");
+        return NULL;
+    }
+    PyObject *retval = PyObject_CallOneArg(state->binascii_hexlify, tmp);
+    Py_DECREF(tmp);
+    return retval;
+}
+
+static PyObject *
+xxtea_object_decrypt_hex(xxtea_object *self, PyObject *data_obj)
+{
+    xxtea_mod_state *state = PyType_GetModuleState(Py_TYPE(self));
+    if (!state || !state->binascii_unhexlify) {
+        PyErr_SetString(PyExc_RuntimeError, "module state not available");
+        return NULL;
+    }
+    PyObject *tmp = PyObject_CallOneArg(state->binascii_unhexlify, data_obj);
+    if (!tmp)
+        return NULL;
+
+    Py_buffer data_buf = {NULL};
+    if (PyObject_GetBuffer(tmp, &data_buf, PyBUF_SIMPLE) < 0) {
+        Py_DECREF(tmp);
+        return NULL;
+    }
+
+    PyObject *retval = _decrypt_impl(data_buf.buf, data_buf.len,
+                                      self->key, self->padding, self->rounds);
+    PyBuffer_Release(&data_buf);
+    Py_DECREF(tmp);
+    return retval;
+}
+
+static PyMethodDef xxtea_object_methods[] = {
+    {"encrypt", (PyCFunction)xxtea_object_encrypt, METH_O,
+     "encrypt(data)\n\n"
+     "Encrypt data with the stored key, padding, and rounds."},
+    {"decrypt", (PyCFunction)xxtea_object_decrypt, METH_O,
+     "decrypt(data)\n\n"
+     "Decrypt data with the stored key, padding, and rounds."},
+    {"encrypt_hex", (PyCFunction)xxtea_object_encrypt_hex, METH_O,
+     "encrypt_hex(data)\n\n"
+     "Encrypt data and return hex-encoded bytes."},
+    {"decrypt_hex", (PyCFunction)xxtea_object_decrypt_hex, METH_O,
+     "decrypt_hex(data)\n\n"
+     "Decrypt hex-encoded data and return original bytes."},
+    {NULL, NULL, 0, NULL}
+};
+
+
+static PyType_Slot xxtea_type_slots[] = {
+    {Py_tp_dealloc, (void *)xxtea_object_dealloc},
+    {Py_tp_doc, (void *)"XXTEA(key, padding=True, rounds=0)\n\n"
+                "XXTEA cipher object.  rounds=0 means auto: 6 + 52 / n, "
+                "where n is the number of 32-bit words in the data.\n"
+                "Methods: encrypt(data), decrypt(data), "
+                "encrypt_hex(data), decrypt_hex(data)."},
+    {Py_tp_methods, xxtea_object_methods},
+    {Py_tp_init, (void *)xxtea_object_init},
+    {Py_tp_new, PyType_GenericNew},
+    {0, NULL}
+};
+
+static PyType_Spec xxtea_type_spec = {
+    .name = "xxtea.XXTEA",
+    .basicsize = sizeof(xxtea_object),
+    .flags = Py_TPFLAGS_DEFAULT,
+    .slots = xxtea_type_slots,
+};
+
+/*****************************************************************************
  * Module Init ****************************************************************
  ****************************************************************************/
 
@@ -571,6 +738,16 @@ static int _exec(PyObject *module)
     }
 
     PyModule_AddStringConstant(module, "VERSION", VERSION);
+
+    PyObject *xxtea_type = PyType_FromModuleAndSpec(module, &xxtea_type_spec, NULL);
+    if (xxtea_type == NULL)
+        return -1;
+    if (PyDict_SetItemString(PyModule_GetDict(module), "XXTEA", xxtea_type) < 0) {
+        Py_DECREF(xxtea_type);
+        return -1;
+    }
+    Py_DECREF(xxtea_type);
+
     return 0;
 }
 
