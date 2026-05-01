@@ -523,6 +523,10 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
 
     /* Unhexlify hex string to bytes, then use shared buffer helper */
     xxtea_mod_state *state = (xxtea_mod_state*)PyModule_GetState(self);
+    if (!state || !state->binascii_unhexlify) {
+        PyErr_SetString(PyExc_RuntimeError, "module state not available");
+        return NULL;
+    }
     PyObject *tmp = PyObject_CallOneArg(state->binascii_unhexlify, data_obj);
     if (!tmp)
         return NULL;
