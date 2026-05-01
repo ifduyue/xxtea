@@ -17,7 +17,7 @@ jobs:
             archs: "AMD64"
           - os: windows-2022
             archs: "x86"
-          - os: windows-2022
+          - os: windows-11-arm
             archs: "ARM64"
           - os: macos-15-intel
             archs: "x86_64"
