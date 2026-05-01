@@ -727,6 +727,8 @@ static int _exec(PyObject *module)
     if (!state->binascii_hexlify || !state->binascii_unhexlify) {
         Py_XDECREF(state->binascii_hexlify);
         Py_XDECREF(state->binascii_unhexlify);
+        state->binascii_hexlify = NULL;
+        state->binascii_unhexlify = NULL;
         PyErr_SetString(PyExc_AttributeError,
             "Failed to get binascii.hexlify or binascii.unhexlify");
         return -1;
