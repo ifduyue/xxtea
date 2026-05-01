@@ -469,6 +469,11 @@ xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
         return NULL;
 
     xxtea_mod_state *state = (xxtea_mod_state*)PyModule_GetState(self);
+    if (!state || !state->binascii_hexlify) {
+        Py_DECREF(tmp);
+        PyErr_SetString(PyExc_RuntimeError, "module state not available");
+        return NULL;
+    }
     PyObject *retval = PyObject_CallOneArg(state->binascii_hexlify, tmp);
     Py_DECREF(tmp);
     return retval;
