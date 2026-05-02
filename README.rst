@@ -34,11 +34,22 @@ bytes and array. Due to this reason, many XXTEA implementations out there are
 not compatible with each other.
 
 In this implementation,  the conversions between bytes and array are
-taken care of by longs2bytes_ and bytes2longs_. `PKCS#7`_ padding is also used
-to make sure that the input bytes are padded to multiple of 4-byte (the size
-of a 32-bit integer) and at least 8-byte long (the size of two 32-bit integer,
-which is required by the XXTEA_ algorithm). As a result of these measures,
-you can encrypt not only texts, but also any binary bytes of any length.
+taken care of by longs2bytes_ and bytes2longs_. A non-standard 4-byte block
+`PKCS#7`_ padding is used to make sure that the input bytes are padded to
+a multiple of 4-byte (the size of a 32-bit integer) and at least 8-byte long
+(the size of two 32-bit integers, which is required by the XXTEA_ algorithm).
+As a result of these measures, you can encrypt not only texts, but also any
+binary bytes of any length.
+
+.. note::
+
+   This implementation uses a **non-standard** 4-byte block PKCS#7 padding
+   instead of the conventional 8-byte or 16-byte block.  For inputs shorter
+   than 4 bytes, a non-standard hack pads an extra 4 bytes (producing
+   pad values 5–8) to satisfy XXTEA's 2-word minimum.  This means the
+   output is **NOT** compatible with other XXTEA implementations.
+   Pass ``padding=False`` for raw XXTEA (requires data length ≥ 8 and
+   multiple of 4).
 
 
 Installation
@@ -128,7 +139,15 @@ representation. They are exactly equivalent to:
 Padding
 ---------
 
-Padding is enabled by default, in this case you can encode any bytes of any length.
+Padding is enabled by default, using a **non-standard 4-byte block PKCS#7**
+scheme.  The pad byte value is ``4 - (len(data) & 3)`` (range 1–4), plus an
+extra 4 bytes when the input is shorter than 4 bytes to meet XXTEA's 2-word
+minimum (producing pad values 5–8).
+
+Because padding always adds at least one byte, encrypting an 8-byte input
+produces a 12-byte ciphertext.  This is incompatible with other XXTEA
+implementations that use a standard block size or skip padding altogether.
+Use ``padding=False`` for raw, unpadded XXTEA.
 
 .. code-block:: python
 
