@@ -1,6 +1,16 @@
 CHANGELOG
 --------------
 
+v5.0.0a2 2026/05/02
+~~~~~~~~~~~~~~~~~~~
+
+- Fix double-free/use-after-free in ``_exec`` module init error path.
+- Fix NULL pointer dereference in ``encrypt_hex`` and ``decrypt_hex``
+  when module state is unavailable.
+- Add 4-byte and 8-byte edge case tests for non-standard PKCS#7 padding.
+- Document non-standard 4-byte block PKCS#7 padding behaviour in README,
+  including the ``pad+4`` hack for inputs < 4 bytes and compatibility note.
+
 v5.0.0a1 2026/04/30
 ~~~~~~~~~~~~~~~~~~~
 
