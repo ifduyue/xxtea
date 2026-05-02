@@ -87,6 +87,56 @@ class TestXXTEA(unittest.TestCase):
             dec = xxtea.decrypt_hex(enc, key, padding=False)
             self.assertEqual(data, dec)
 
+    # ── short input / 4-byte / 8-byte edge cases (non-standard PKCS#7) ──
+
+    def test_encrypt_decrypt_4byte_edge(self):
+        """4-byte data: all 256 last-byte values round-trip correctly.
+
+        The non-standard PKCS#7 adds 4 pad bytes (pad=4), and the
+        unpadding strip must work regardless of the plaintext's last
+        byte value."""
+        key = os.urandom(16)
+        for last in range(256):
+            data = b'\x00\x00\x00' + bytes([last])
+            enc = xxtea.encrypt(data, key)
+            dec = xxtea.decrypt(enc, key)
+            self.assertEqual(data, dec,
+                             f'4-byte edge failed at last={last}')
+
+    def test_encrypt_decrypt_8byte_edge(self):
+        """8-byte data: a multiple of the XXTEA 2-word minimum.
+
+        The 4-byte PKCS#7 adds a full block of padding (4 bytes of
+        value 4) even when data is already a multiple of 4 bytes."""
+        key = os.urandom(16)
+        for last in range(256):
+            data = b'\x00' * 7 + bytes([last])
+            enc = xxtea.encrypt(data, key)
+            dec = xxtea.decrypt(enc, key)
+            self.assertEqual(data, dec,
+                             f'8-byte edge failed at last={last}')
+
+    def test_encrypt_decrypt_short_inputs(self):
+        """Inputs < 4 bytes trigger pad+4 hack (pad values 5-8)."""
+        key = os.urandom(16)
+        for length in range(4):
+            data = os.urandom(length)
+            enc = xxtea.encrypt(data, key)
+            dec = xxtea.decrypt(enc, key)
+            self.assertEqual(data, dec,
+                             f'short input length={length} failed')
+
+    def test_encrypt_decrypt_all_short_lengths(self):
+        """Systematic round-trip for every length 0..16, 8 variants each."""
+        key = os.urandom(16)
+        for length in range(17):
+            for _ in range(8):
+                data = os.urandom(length)
+                enc = xxtea.encrypt(data, key)
+                dec = xxtea.decrypt(enc, key)
+                self.assertEqual(data, dec,
+                                 f'length={length} failed')
+
     def test_hex_encode(self):
         for i in range(2048):
             key = os.urandom(16)
