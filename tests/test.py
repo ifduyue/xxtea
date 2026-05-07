@@ -173,6 +173,36 @@ class TestXXTEA(unittest.TestCase):
         self.assertRaises(ValueError, f3)
 
 
+class TestLargeData(unittest.TestCase):
+    """Verify encrypt/decrypt with large data doesn't overflow."""
+
+    LARGE_SIZE = 100 * 1024 * 1024  # 100 MB
+
+    def test_large_data_roundtrip(self):
+        try:
+            data = b'\x00' * self.LARGE_SIZE
+        except MemoryError:
+            self.skipTest('insufficient memory for large buffer')
+
+        key = os.urandom(16)
+        enc = xxtea.encrypt(data, key)
+        dec = xxtea.decrypt(enc, key)
+        self.assertEqual(len(dec), len(data))
+        self.assertEqual(dec, data)
+
+    def test_large_data_nopadding_roundtrip(self):
+        try:
+            data = b'\x00' * self.LARGE_SIZE
+        except MemoryError:
+            self.skipTest('insufficient memory for large buffer')
+
+        key = os.urandom(16)
+        enc = xxtea.encrypt(data, key, padding=False)
+        dec = xxtea.decrypt(enc, key, padding=False)
+        self.assertEqual(len(dec), len(data))
+        self.assertEqual(dec, data)
+
+
 class TestArgPassing(unittest.TestCase):
     """Test all parameter passing combinations for encrypt/decrypt/encrypt_hex/decrypt_hex."""
 
