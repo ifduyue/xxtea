@@ -4,6 +4,7 @@ CHANGELOG
 v5.0.0 2026/05/08
 ~~~~~~~~~~~~~~~~~~~
 
+- Sub-interpreters support.
 - Add :class:`XXTEA` type — reusable cipher object holding key, padding, and rounds.
   ``encrypt()``, ``decrypt()``, ``encrypt_hex()``, and ``decrypt_hex()`` take only data,
   using the stored settings.
