@@ -1,6 +1,13 @@
 CHANGELOG
 --------------
 
+v5.1.0 2026/06/15
+~~~~~~~~~~~~~~~~~~~
+
+- Build Pyodide (Emscripten/WASM) wheels.
+- Drop ``Py_SET_SIZE`` polyfill (no longer needed since Python ≥ 3.9).
+
+
 v5.0.0 2026/05/08
 ~~~~~~~~~~~~~~~~~~~
 

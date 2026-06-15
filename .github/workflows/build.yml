@@ -23,9 +23,9 @@ jobs:
             archs: "x86_64"
           - os: macos-14
             archs: "arm64"
-          #- os: ubuntu-22.04
-          #  archs: "wasm32"
-          #  platform: "pyodide"
+          - os: ubuntu-24.04
+            archs: "wasm32"
+            platform: "pyodide"
           - os: ubuntu-24.04
             archs: "arm64_v8a, x86_64"
             platform: "android"
@@ -55,7 +55,7 @@ jobs:
         if: runner.os == 'Linux'
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4.0.0
+        uses: pypa/cibuildwheel@v4.1.0
         env:
           CIBW_ARCHS: "${{ matrix.archs }}"
           CIBW_BUILD: "${{ matrix.build && '*-' || ''}}${{ matrix.build }}*"
