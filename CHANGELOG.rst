@@ -1,6 +1,14 @@
 CHANGELOG
 --------------
 
+v5.2.0 2026/06/19
+~~~~~~~~~~~~~~~~~~~
+
+- :class:`XXTEA` type now uses vectorcall for construction (Python ≥ 3.9),
+  up to 2.9× faster for keyword arguments.
+- Rewrite argument parsing to share logic between vectorcall and ``tp_init``.
+
+
 v5.1.0 2026/06/15
 ~~~~~~~~~~~~~~~~~~~
 
