@@ -550,16 +550,104 @@ typedef struct {
     int padding;
 } xxtea_object;
 
+/*
+ * Manually parse XXTEA(key, padding=True, rounds=0) for both the
+ * vectorcall constructor and the legacy tp_init fallback.
+ * Returns 0 on success, -1 on error with an exception set.
+ */
 static int
-xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
+_parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
+                 PyObject **key_obj, int *padding, Py_ssize_t *rounds)
 {
-    static char *kwlist[] = {"key", "padding", "rounds", NULL};
-    Py_buffer key_buf = {NULL};
-    int padding = 1;
-    Py_ssize_t rounds = 0;
+    int key_set = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|pn", kwlist,
-                                     &key_buf, &padding, &rounds))
+    *key_obj = NULL;
+    *padding = 1;
+    *rounds = 0;
+
+    if (nargs > 3) {
+        PyErr_SetString(PyExc_TypeError,
+            "XXTEA() takes at most 3 positional arguments");
+        return -1;
+    }
+
+    /* Positional: key, [padding], [rounds] */
+    if (nargs > 0) { *key_obj = args[0]; key_set = 1; }
+
+    /* Keyword loop */
+    if (kwnames != NULL) {
+        Py_ssize_t nkwargs = PyTuple_GET_SIZE(kwnames);
+        for (Py_ssize_t i = 0; i < nkwargs; i++) {
+            PyObject *name = PyTuple_GET_ITEM(kwnames, i);
+            PyObject *value = args[nargs + i];
+
+            if (PyUnicode_CompareWithASCIIString(name, "key") == 0) {
+                if (key_set) {
+                    PyErr_SetString(PyExc_TypeError,
+                        "argument 'key' given both as positional and keyword");
+                    return -1;
+                }
+                *key_obj = value;
+                key_set = 1;
+            }
+            else if (PyUnicode_CompareWithASCIIString(name, "padding") == 0) {
+                if (nargs > 1) {
+                    PyErr_SetString(PyExc_TypeError,
+                        "argument 'padding' given both as positional and keyword");
+                    return -1;
+                }
+                int res = PyObject_IsTrue(value);
+                if (res < 0) return -1;
+                *padding = res;
+            }
+            else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
+                if (nargs > 2) {
+                    PyErr_SetString(PyExc_TypeError,
+                        "argument 'rounds' given both as positional and keyword");
+                    return -1;
+                }
+                Py_ssize_t val = PyLong_AsSsize_t(value);
+                if (val == -1 && PyErr_Occurred()) return -1;
+                *rounds = val;
+            }
+            else {
+                PyErr_Format(PyExc_TypeError,
+                    "'%U' is an invalid keyword argument for XXTEA()", name);
+                return -1;
+            }
+        }
+    }
+
+    /* Positional: padding, rounds (keyword conflicts already caught above) */
+    if (nargs > 1) {
+        int res = PyObject_IsTrue(args[1]);
+        if (res < 0) return -1;
+        *padding = res;
+    }
+    if (nargs > 2) {
+        Py_ssize_t val = PyLong_AsSsize_t(args[2]);
+        if (val == -1 && PyErr_Occurred()) return -1;
+        *rounds = val;
+    }
+
+    if (!*key_obj) {
+        PyErr_SetString(PyExc_TypeError,
+            "XXTEA() missing required argument: 'key'");
+        return -1;
+    }
+    return 0;
+}
+
+/*
+ * Apply parsed key/padding/rounds to a fresh xxtea_object.
+ * Returns 0 on success, -1 on error with an exception set.
+ */
+static int
+_apply_init_args(xxtea_object *self, PyObject *key_obj, int padding, Py_ssize_t rounds)
+{
+    Py_buffer key_buf = {NULL};
+
+    if (PyObject_GetBuffer(key_obj, &key_buf, PyBUF_SIMPLE) < 0)
         return -1;
 
     if (key_buf.len != 16) {
@@ -581,6 +669,90 @@ xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
     return 0;
 }
 
+/*
+ * Legacy tp_init fallback.  Convert the (args, kwargs) tuple/dict form into
+ * the vectorcall layout and reuse _parse_init_args so there is only one copy
+ * of the argument-parsing logic.
+ */
+static int
+xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
+{
+
+    PyObject *key_obj = NULL;
+    int padding = 1;
+    Py_ssize_t rounds = 0;
+
+    Py_ssize_t nargs = PyTuple_GET_SIZE(args);
+    Py_ssize_t nkwargs = (kwargs != NULL) ? PyDict_GET_SIZE(kwargs) : 0;
+
+    if (nargs + nkwargs > 3) {
+        PyErr_SetString(PyExc_TypeError,
+            "XXTEA() takes at most 3 arguments");
+        return -1;
+    }
+
+    PyObject *all_args[3] = {NULL};
+    for (Py_ssize_t i = 0; i < nargs; i++) {
+        all_args[i] = PyTuple_GET_ITEM(args, i);
+    }
+
+    PyObject *kwnames = NULL;
+    if (nkwargs > 0) {
+        kwnames = PyTuple_New(nkwargs);
+        if (kwnames == NULL)
+            return -1;
+        Py_ssize_t pos = 0, idx = 0;
+        PyObject *key, *value;
+        while (PyDict_Next(kwargs, &pos, &key, &value)) {
+            if (!PyUnicode_Check(key)) {
+                PyErr_SetString(PyExc_TypeError, "keywords must be strings");
+                Py_DECREF(kwnames);
+                return -1;
+            }
+            Py_INCREF(key);
+            PyTuple_SET_ITEM(kwnames, idx, key);
+            all_args[nargs + idx] = value;
+            idx++;
+        }
+    }
+
+    int rc = _parse_init_args(all_args, nargs, kwnames,
+                              &key_obj, &padding, &rounds);
+    Py_XDECREF(kwnames);
+    if (rc < 0)
+        return -1;
+
+    return _apply_init_args(self, key_obj, padding, rounds);
+}
+
+/* Vectorcall constructor for XXTEA(key, ...). */
+static PyObject *
+xxtea_vectorcall(PyObject *type, PyObject *const *args,
+                 size_t nargsf, PyObject *kwnames)
+{
+
+
+    PyObject *key_obj = NULL;
+    int padding = 1;
+    Py_ssize_t rounds = 0;
+    Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
+
+    if (_parse_init_args(args, nargs, kwnames, &key_obj, &padding, &rounds) < 0)
+        return NULL;
+
+    /* Allocate a new instance via tp_alloc (not PyObject_New, because it
+     * must be a heap type with the right ob_type). */
+    PyObject *self = ((PyTypeObject *)type)->tp_alloc((PyTypeObject *)type, 0);
+    if (self == NULL)
+        return NULL;
+
+    if (_apply_init_args((xxtea_object *)self, key_obj, padding, rounds) < 0) {
+        Py_DECREF(self);
+        return NULL;
+    }
+    return self;
+}
+
 static void
 xxtea_object_dealloc(xxtea_object *self)
 {
@@ -590,11 +762,10 @@ xxtea_object_dealloc(xxtea_object *self)
 }
 
 static PyObject *
-xxtea_object_encrypt(xxtea_object *self, PyObject *data_obj)
+xxtea_object_encrypt(xxtea_object *self, PyObject *data)
 {
     Py_buffer data_buf = {NULL};
-
-    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
+    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
         return NULL;
 
     PyObject *retval = _encrypt_impl(data_buf.buf, data_buf.len,
@@ -604,11 +775,10 @@ xxtea_object_encrypt(xxtea_object *self, PyObject *data_obj)
 }
 
 static PyObject *
-xxtea_object_decrypt(xxtea_object *self, PyObject *data_obj)
+xxtea_object_decrypt(xxtea_object *self, PyObject *data)
 {
     Py_buffer data_buf = {NULL};
-
-    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
+    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
         return NULL;
 
     PyObject *retval = _decrypt_impl(data_buf.buf, data_buf.len,
@@ -618,11 +788,10 @@ xxtea_object_decrypt(xxtea_object *self, PyObject *data_obj)
 }
 
 static PyObject *
-xxtea_object_encrypt_hex(xxtea_object *self, PyObject *data_obj)
+xxtea_object_encrypt_hex(xxtea_object *self, PyObject *data)
 {
     Py_buffer data_buf = {NULL};
-
-    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
+    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
         return NULL;
 
     PyObject *tmp = _encrypt_impl(data_buf.buf, data_buf.len,
@@ -643,14 +812,14 @@ xxtea_object_encrypt_hex(xxtea_object *self, PyObject *data_obj)
 }
 
 static PyObject *
-xxtea_object_decrypt_hex(xxtea_object *self, PyObject *data_obj)
+xxtea_object_decrypt_hex(xxtea_object *self, PyObject *data)
 {
     xxtea_mod_state *state = PyType_GetModuleState(Py_TYPE(self));
     if (!state || !state->binascii_unhexlify) {
         PyErr_SetString(PyExc_RuntimeError, "module state not available");
         return NULL;
     }
-    PyObject *tmp = PyObject_CallOneArg(state->binascii_unhexlify, data_obj);
+    PyObject *tmp = PyObject_CallOneArg(state->binascii_unhexlify, data);
     if (!tmp)
         return NULL;
 
@@ -743,6 +912,19 @@ static int _exec(PyObject *module)
     PyObject *xxtea_type = PyType_FromModuleAndSpec(module, &xxtea_type_spec, NULL);
     if (xxtea_type == NULL)
         return -1;
+
+#if PY_VERSION_HEX >= 0x03090000
+    /*
+     * Hook up the vectorcall constructor.  PyType_Type.tp_vectorcall_offset
+     * points to tp_vectorcall in PyTypeObject (since 3.9), so
+     * _PyVectorcall_Function reads xxtea_type->tp_vectorcall directly.
+     *
+     * The flag is set here (not in PyType_Spec) to avoid a 3.12+
+     * debug-build assertion on heap types without tp_vectorcall_offset.
+     */
+    ((PyTypeObject *)xxtea_type)->tp_flags |= Py_TPFLAGS_HAVE_VECTORCALL;
+    ((PyTypeObject *)xxtea_type)->tp_vectorcall = xxtea_vectorcall;
+#endif
 
     if (PyDict_SetItemString(PyModule_GetDict(module), "XXTEA", xxtea_type) < 0) {
         Py_DECREF(xxtea_type);
