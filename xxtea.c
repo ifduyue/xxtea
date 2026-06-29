@@ -557,7 +557,7 @@ typedef struct {
  */
 static int
 _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
-                 PyObject **key_obj, int *padding, Py_ssize_t *rounds)
+                 PyObject **key_obj, int *padding, unsigned int *rounds)
 {
     int key_set = 0;
 
@@ -606,9 +606,13 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                         "argument 'rounds' given both as positional and keyword");
                     return -1;
                 }
-                Py_ssize_t val = PyLong_AsSsize_t(value);
-                if (val == -1 && PyErr_Occurred()) return -1;
-                *rounds = val;
+                unsigned long val = PyLong_AsUnsignedLong(value);
+                if (val == (unsigned long)-1 && PyErr_Occurred()) return -1;
+                if (val > UINT_MAX) {
+                    PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+                    return -1;
+                }
+                *rounds = (unsigned int)val;
             }
             else {
                 PyErr_Format(PyExc_TypeError,
@@ -625,9 +629,13 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
         *padding = res;
     }
     if (nargs > 2) {
-        Py_ssize_t val = PyLong_AsSsize_t(args[2]);
-        if (val == -1 && PyErr_Occurred()) return -1;
-        *rounds = val;
+        unsigned long val = PyLong_AsUnsignedLong(args[2]);
+        if (val == (unsigned long)-1 && PyErr_Occurred()) return -1;
+        if (val > UINT_MAX) {
+            PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+            return -1;
+        }
+        *rounds = (unsigned int)val;
     }
 
     if (!*key_obj) {
@@ -643,7 +651,7 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
  * Returns 0 on success, -1 on error with an exception set.
  */
 static int
-_apply_init_args(xxtea_object *self, PyObject *key_obj, int padding, Py_ssize_t rounds)
+_apply_init_args(xxtea_object *self, PyObject *key_obj, int padding, unsigned int rounds)
 {
     Py_buffer key_buf = {NULL};
 
@@ -656,14 +664,8 @@ _apply_init_args(xxtea_object *self, PyObject *key_obj, int padding, Py_ssize_t 
         return -1;
     }
 
-    if (rounds < 0 || (size_t)rounds > UINT_MAX) {
-        PyErr_SetString(PyExc_OverflowError, "rounds value too large");
-        PyBuffer_Release(&key_buf);
-        return -1;
-    }
-
     memcpy(self->key, key_buf.buf, 16);
-    self->rounds = (unsigned int)rounds;
+    self->rounds = rounds;
     self->padding = padding;
     PyBuffer_Release(&key_buf);
     return 0;
@@ -680,7 +682,7 @@ xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
 
     PyObject *key_obj = NULL;
     int padding = 1;
-    Py_ssize_t rounds = 0;
+    unsigned int rounds = 0;
 
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
     Py_ssize_t nkwargs = (kwargs != NULL) ? PyDict_GET_SIZE(kwargs) : 0;
@@ -734,7 +736,7 @@ xxtea_vectorcall(PyObject *type, PyObject *const *args,
 
     PyObject *key_obj = NULL;
     int padding = 1;
-    Py_ssize_t rounds = 0;
+    unsigned int rounds = 0;
     Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
 
     if (_parse_init_args(args, nargs, kwnames, &key_obj, &padding, &rounds) < 0)
