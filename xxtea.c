@@ -365,18 +365,18 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
+    Py_ssize_t alen = data_len / 4;
+    if (alen > INT_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "data too large");
+        return NULL;
+    }
+
     PyObject *retval = PyBytes_FromStringAndSize(NULL, data_len);
 
     if (!retval) {
         return NULL;
     }
 
-    Py_ssize_t alen = data_len / 4;
-    if (alen > INT_MAX) {
-        PyErr_SetString(PyExc_OverflowError, "data too large");
-        Py_DECREF(retval);
-        return NULL;
-    }
     d = (uint32_t *)calloc((size_t)alen, sizeof(uint32_t));
 
     if (d == NULL) {
