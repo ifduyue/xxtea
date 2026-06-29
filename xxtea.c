@@ -304,14 +304,15 @@ _get_buffers(PyObject *data_obj, PyObject *key_obj,
 
 /*
  * Internal encrypt implementation — takes raw buffers, returns PyBytes or NULL.
+ *
+ * Writes directly into the PyBytes object's internal buffer to avoid an
+ * intermediate heap allocation and an extra longs->bytes copy.
  */
 static inline PyObject *
 _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
               const char *key_buf, int padding, unsigned int rounds)
 {
-    uint32_t *d = NULL;
     uint32_t k[4] = {0};
-    PyObject *retval = NULL;
 
     if (!padding && (data_len < 8 || (data_len & 3) != 0)) {
         PyErr_SetString(PyExc_ValueError,
@@ -324,11 +325,18 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
         PyErr_SetString(PyExc_OverflowError, "data too large");
         return NULL;
     }
-    d = (uint32_t *)calloc((size_t)alen, sizeof(uint32_t));
 
-    if (d == NULL) {
-        return PyErr_NoMemory();
+    PyObject *retval = PyBytes_FromStringAndSize(NULL, alen << 2);
+    if (!retval) {
+        return NULL;
     }
+
+    uint32_t *d = (uint32_t *)PyBytes_AsString(retval);
+    /*
+     * Zero all output words before OR-ing in leftover bytes / padding.
+     * bytes2longs relies on the buffer being initially zero-filled.
+     */
+    memset(d, 0, (size_t)alen * sizeof(uint32_t));
 
     Py_BEGIN_ALLOW_THREADS
     bytes2longs(data_buf, data_len, d, padding);
@@ -336,27 +344,20 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
     btea(d, (int)alen, k, rounds);
     Py_END_ALLOW_THREADS
 
-    retval = PyBytes_FromStringAndSize(NULL, alen << 2);
-
-    if (!retval) {
-        free(d);
-        return NULL;
-    }
-
-    longs2bytes(d, alen, PyBytes_AsString(retval), 0);
-
-    free(d);
     return retval;
 }
 
 /*
  * Internal decrypt implementation — takes raw buffers, returns PyBytes or NULL.
+ *
+ * The ciphertext length is already a multiple of 4 and >= 8, so we decrypt
+ * in place inside the output PyBytes object and then shrink it if padding
+ * is enabled.
  */
 static inline PyObject *
 _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
               const char *key_buf, int padding, unsigned int rounds)
 {
-    uint32_t *d = NULL;
     uint32_t k[4] = {0};
 
     if (data_len & 3 || data_len < 8) {
@@ -372,25 +373,17 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
     }
 
     PyObject *retval = PyBytes_FromStringAndSize(NULL, data_len);
-
     if (!retval) {
         return NULL;
-    }
-
-    d = (uint32_t *)calloc((size_t)alen, sizeof(uint32_t));
-
-    if (d == NULL) {
-        Py_DECREF(retval);
-        return PyErr_NoMemory();
     }
 
     char *retbuf = PyBytes_AsString(retval);
     Py_ssize_t rc;
     Py_BEGIN_ALLOW_THREADS
-    bytes2longs(data_buf, data_len, d, 0);
+    bytes2longs(data_buf, data_len, (uint32_t *)retbuf, 0);
     bytes2longs(key_buf, 16, k, 0);
-    btea(d, -(int)alen, k, rounds);
-    rc = longs2bytes(d, alen, retbuf, padding);
+    btea((uint32_t *)retbuf, -(int)alen, k, rounds);
+    rc = longs2bytes((uint32_t *)retbuf, alen, retbuf, padding);
     Py_END_ALLOW_THREADS
 
     if (padding) {
@@ -407,7 +400,6 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         }
     }
 
-    free(d);
     return retval;
 }
 
