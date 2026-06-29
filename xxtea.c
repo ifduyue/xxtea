@@ -162,9 +162,26 @@ static Py_ssize_t longs2bytes(uint32_t *in, Py_ssize_t inlen, char *out, int pad
             return -2;
         }
 
-        for (i = outlen; i < inlen * 4; i++) {
-            if (s[i] != pad) {
-                return -3;
+        /*
+         * Validate padding bytes in word-sized chunks when possible.
+         * Build a 32-bit mask of the expected pad byte repeated four
+         * times and compare trailing whole words.
+         */
+        if (pad == 4 || pad == 8) {
+            uint32_t expected = (uint32_t)pad * 0x01010101U;
+            Py_ssize_t word_count = pad >> 2;
+            uint32_t *words = (uint32_t *)(s + outlen);
+            for (i = 0; i < word_count; i++) {
+                if (words[i] != expected) {
+                    return -3;
+                }
+            }
+        }
+        else {
+            for (i = outlen; i < inlen * 4; i++) {
+                if (s[i] != pad) {
+                    return -3;
+                }
             }
         }
     }
