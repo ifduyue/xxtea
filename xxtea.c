@@ -127,7 +127,7 @@ static Py_ssize_t bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, i
     return ((i - 1) >> 2) + 1;
 }
 
-static Py_ssize_t longs2bytes(uint32_t *in, Py_ssize_t inlen, char *out, int padding)
+static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, int padding)
 {
     Py_ssize_t i, outlen;
     int pad;
@@ -135,15 +135,37 @@ static Py_ssize_t longs2bytes(uint32_t *in, Py_ssize_t inlen, char *out, int pad
 
     s = (unsigned char *)out;
 
-    for (i = 0; i < inlen; i++) {
+    /*
+     * In-place path: used by _decrypt_impl where `out` is the same PyBytes
+     * buffer that already holds the uint32_t words.
+     * - Little endian: the byte representation is already correct, nothing to do.
+     * - Big endian: swap each word's bytes.  Read the whole word into a local
+     *   variable before writing any of its bytes, because in and s alias.
+     */
+    if (in == (const uint32_t *)out) {
 #if PY_LITTLE_ENDIAN
-        memcpy(s + 4 * i, &in[i], 4);
+        /* nothing */
 #else
-        s[4 * i] = (unsigned char)(in[i] & 0xFF);
-        s[4 * i + 1] = (unsigned char)((in[i] >> 8) & 0xFF);
-        s[4 * i + 2] = (unsigned char)((in[i] >> 16) & 0xFF);
-        s[4 * i + 3] = (unsigned char)((in[i] >> 24) & 0xFF);
+        for (i = 0; i < inlen; i++) {
+            uint32_t word = in[i];
+            s[4 * i] = (unsigned char)(word & 0xFF);
+            s[4 * i + 1] = (unsigned char)((word >> 8) & 0xFF);
+            s[4 * i + 2] = (unsigned char)((word >> 16) & 0xFF);
+            s[4 * i + 3] = (unsigned char)((word >> 24) & 0xFF);
+        }
 #endif
+    }
+    else {
+        for (i = 0; i < inlen; i++) {
+#if PY_LITTLE_ENDIAN
+            memcpy(s + 4 * i, &in[i], 4);
+#else
+            s[4 * i] = (unsigned char)(in[i] & 0xFF);
+            s[4 * i + 1] = (unsigned char)((in[i] >> 8) & 0xFF);
+            s[4 * i + 2] = (unsigned char)((in[i] >> 16) & 0xFF);
+            s[4 * i + 3] = (unsigned char)((in[i] >> 24) & 0xFF);
+#endif
+        }
     }
 
     outlen = inlen * 4;
