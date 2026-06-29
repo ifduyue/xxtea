@@ -1,6 +1,21 @@
 CHANGELOG
 --------------
 
+v5.3.0 2026/06/29
+~~~~~~~~~~~~~~~~~~~
+
+- Avoid an intermediate heap buffer in ``encrypt()`` and ``decrypt()`` by
+  writing directly into the ``PyBytes`` object's internal buffer.  This also
+  removes the now-redundant trailing-null write in ``longs2bytes`` because
+  ``PyBytes_FromStringAndSize`` already guarantees a null terminator.
+- Optimize PKCS#7 padding validation with word-sized comparisons for the
+  common ``pad == 4`` and ``pad == 8`` cases.
+- Move the ``alen > INT_MAX`` check before allocation in ``_decrypt_impl``.
+- Unify ``rounds`` parsing between module functions and the :class:`XXTEA`
+  constructor, both now use ``PyLong_AsUnsignedLong`` with an immediate
+  ``UINT_MAX`` check.
+
+
 v5.2.0 2026/06/19
 ~~~~~~~~~~~~~~~~~~~
 
