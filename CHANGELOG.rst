@@ -24,7 +24,6 @@ v5.3.0 2026/06/29
   constructor, both now use ``PyLong_AsUnsignedLong`` with an immediate
   ``UINT_MAX`` check.
 
-
 v5.2.0 2026/06/19
 ~~~~~~~~~~~~~~~~~~~
 
@@ -38,7 +37,6 @@ v5.1.0 2026/06/15
 
 - Build Pyodide (Emscripten/WASM) wheels.
 - Drop ``Py_SET_SIZE`` polyfill (no longer needed since Python ≥ 3.9).
-
 
 v5.0.0 2026/05/08
 ~~~~~~~~~~~~~~~~~~~
@@ -55,6 +53,15 @@ v5.0.0 2026/05/08
 - Document non-standard 4-byte block PKCS#7 padding behaviour in README,
   including the ``pad+4`` hack for inputs < 4 bytes and compatibility note.
 - Add 4-byte and 8-byte edge case tests for non-standard PKCS#7 padding.
+
+v4.0.1 2026/06/30
+~~~~~~~~~~~~~~~~~~~
+
+- Fix big-endian correctness: ciphertext is now always encoded as little-endian
+  bytes, so encryption/decryption round-trips and produces identical output on
+  all architectures.
+- Fix ``longs2bytes`` in-place handling on big-endian hosts.
+- Add s390x big-endian CI job and regression test.
 
 v4.0.0 2026/04/27
 ~~~~~~~~~~~~~~~~~~~
