@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define VERSION "4.0.0"
+#define VERSION "4.0.1.dev0"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
@@ -360,6 +360,10 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
+    /*
+     * longs2bytes writes little-endian bytes on big-endian hosts, so the
+     * ciphertext is identical across architectures.
+     */
     retbuf = PyBytes_AsString(retval);
     longs2bytes(d, alen, retbuf, 0);
 
