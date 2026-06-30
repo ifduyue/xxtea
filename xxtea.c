@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "5.1.0"
+#define VERSION "5.1.1.dev0"
 
 #define DELTA 0x9e3779b9U
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
@@ -365,6 +365,10 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
+    /*
+     * longs2bytes writes little-endian bytes on big-endian hosts, so the
+     * ciphertext is identical across architectures.
+     */
     longs2bytes(d, alen, PyBytes_AsString(retval), 0);
 
     free(d);
