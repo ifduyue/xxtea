@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "5.0.1.dev0"
+#define VERSION "5.0.1"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
