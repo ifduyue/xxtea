@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "5.3.0"
+#define VERSION "5.3.1.dev0"
 
 #define DELTA 0x9e3779b9U
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
@@ -381,6 +381,16 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
     bytes2longs(data_buf, data_len, d, padding);
     bytes2longs(key_buf, 16, k, 0);
     btea(d, (int)alen, k, rounds);
+#if !PY_LITTLE_ENDIAN
+    /*
+     * On a big-endian host the raw uint32_t memory layout in the PyBytes
+     * buffer would be big-endian, but we want the ciphertext to be
+     * little-endian on the wire.  Rewrite the buffer word-by-word as
+     * little-endian bytes (safe because we read each word before writing
+     * its bytes).
+     */
+    longs2bytes(d, alen, (char *)d, 0);
+#endif
     Py_END_ALLOW_THREADS
 
     return retval;
