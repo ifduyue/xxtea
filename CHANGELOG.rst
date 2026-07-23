@@ -1,6 +1,13 @@
 CHANGELOG
 --------------
 
+v5.0.2 2026/07/24
+~~~~~~~~~~~~~~~~~~~
+
+- Clarify XXTEA comments and docstrings.
+- Extract internal XXTEA C helpers to reduce duplication.
+- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
+
 v5.0.1 2026/06/30
 ~~~~~~~~~~~~~~~~~~~
 
