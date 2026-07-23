@@ -209,6 +209,23 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
  * Module Functions ***********************************************************
  ****************************************************************************/
 
+typedef PyObject *(*xxtea_crypt_func)(const char *, Py_ssize_t,
+                                      const char *, int, unsigned int);
+
+static inline int
+_parse_rounds(PyObject *obj, unsigned int *rounds)
+{
+    unsigned long val = PyLong_AsUnsignedLong(obj);
+    if (val == (unsigned long)-1 && PyErr_Occurred())
+        return -1;
+    if (val > UINT_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+        return -1;
+    }
+    *rounds = (unsigned int)val;
+    return 0;
+}
+
 /*
  * Parse all arguments in a single pass.  Returns 0 on success, -1 on error.
  */
@@ -267,15 +284,8 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                 if (nargs > 3) { PyErr_SetString(PyExc_TypeError,
                     "argument 'rounds' given both as positional and keyword");
                     return -1; }
-                unsigned long val = PyLong_AsUnsignedLong(value);
-                if (val == (unsigned long)-1 && PyErr_Occurred())
+                if (_parse_rounds(value, rounds) < 0)
                     return -1;
-                if (val > UINT_MAX) {
-                    PyErr_SetString(PyExc_OverflowError,
-                        "rounds value too large");
-                    return -1;
-                }
-                *rounds = (unsigned int)val;
                 rounds_set = 1;
             }
             else {
@@ -293,14 +303,8 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
         *padding = res;
     }
     if (nargs > 3 && !rounds_set) {
-        unsigned long val = PyLong_AsUnsignedLong(args[3]);
-        if (val == (unsigned long)-1 && PyErr_Occurred())
+        if (_parse_rounds(args[3], rounds) < 0)
             return -1;
-        if (val > UINT_MAX) {
-            PyErr_SetString(PyExc_OverflowError, "rounds value too large");
-            return -1;
-        }
-        *rounds = (unsigned int)val;
     }
 
     if (!*data_obj || !*key_obj) {
