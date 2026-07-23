@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "5.1.1"
+#define VERSION "5.1.2"
 
 #define DELTA 0x9e3779b9U
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
@@ -558,6 +558,19 @@ typedef struct {
     int padding;
 } xxtea_object;
 
+static PyObject *
+_call_object_crypt(xxtea_object *self, PyObject *data, xxtea_crypt_func crypt)
+{
+    Py_buffer data_buf = {NULL};
+    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
+        return NULL;
+
+    PyObject *retval = crypt(data_buf.buf, data_buf.len,
+                             self->key, self->padding, self->rounds);
+    PyBuffer_Release(&data_buf);
+    return retval;
+}
+
 static int
 xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
 {
@@ -600,42 +613,19 @@ xxtea_object_dealloc(xxtea_object *self)
 static PyObject *
 xxtea_object_encrypt(xxtea_object *self, PyObject *data_obj)
 {
-    Py_buffer data_buf = {NULL};
-
-    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
-        return NULL;
-
-    PyObject *retval = _encrypt_impl(data_buf.buf, data_buf.len,
-                                      self->key, self->padding, self->rounds);
-    PyBuffer_Release(&data_buf);
-    return retval;
+    return _call_object_crypt(self, data_obj, _encrypt_impl);
 }
 
 static PyObject *
 xxtea_object_decrypt(xxtea_object *self, PyObject *data_obj)
 {
-    Py_buffer data_buf = {NULL};
-
-    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
-        return NULL;
-
-    PyObject *retval = _decrypt_impl(data_buf.buf, data_buf.len,
-                                      self->key, self->padding, self->rounds);
-    PyBuffer_Release(&data_buf);
-    return retval;
+    return _call_object_crypt(self, data_obj, _decrypt_impl);
 }
 
 static PyObject *
 xxtea_object_encrypt_hex(xxtea_object *self, PyObject *data_obj)
 {
-    Py_buffer data_buf = {NULL};
-
-    if (PyObject_GetBuffer(data_obj, &data_buf, PyBUF_SIMPLE) < 0)
-        return NULL;
-
-    PyObject *tmp = _encrypt_impl(data_buf.buf, data_buf.len,
-                                   self->key, self->padding, self->rounds);
-    PyBuffer_Release(&data_buf);
+    PyObject *tmp = _call_object_crypt(self, data_obj, _encrypt_impl);
     if (!tmp)
         return NULL;
 
@@ -649,11 +639,7 @@ static PyObject *
 xxtea_object_decrypt_hex(xxtea_object *self, PyObject *data_obj)
 {
     xxtea_mod_state *state = PyType_GetModuleState(Py_TYPE(self));
-    if (!state || !state->binascii_unhexlify) {
-        PyErr_SetString(PyExc_RuntimeError, "module state not available");
-        return NULL;
-    }
-    PyObject *tmp = PyObject_CallOneArg(state->binascii_unhexlify, data_obj);
+    PyObject *tmp = _call_one_arg(state ? state->binascii_unhexlify : NULL, data_obj);
     if (!tmp)
         return NULL;
 
