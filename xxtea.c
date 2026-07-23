@@ -117,19 +117,17 @@ static Py_ssize_t bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, i
         out[i >> 2] |= (uint32_t)s[i] << ((i & 3) << 3);
     }
 
-    /* PKCS#7 padding */
+    /* 4-byte PKCS#7-style padding; short inputs are padded to two words. */
     if (padding) {
         pad = 4 - (inlen & 3);
-        /* make sure length of out >= 2 */
+        /* Ensure XXTEA always has at least two 32-bit words. */
         pad = (inlen < 4) ? pad + 4 : pad;
         for (; i < inlen + pad; i++) {
             out[i >> 2] |= (uint32_t)pad << ((i & 3) << 3);
         }
     }
 
-    /* Divided by 4, and then rounded up (ceil) to an integer.
-     * Which is the number of how many longs we've got.
-     */
+    /* Return the number of 32-bit words, rounded up from bytes. */
     return ((i - 1) >> 2) + 1;
 }
 
@@ -150,7 +148,7 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
      */
     if (in == (const uint32_t *)out) {
 #if PY_LITTLE_ENDIAN
-        /* nothing */
+        /* No byte swap needed. */
 #else
         for (i = 0; i < inlen; i++) {
             uint32_t word = in[i];
@@ -176,7 +174,7 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
 
     outlen = inlen * 4;
 
-    /* PKCS#7 unpadding */
+    /* 4-byte PKCS#7-style unpadding. */
     if (padding) {
         pad = s[outlen - 1];
         outlen -= pad;
@@ -427,13 +425,12 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
 
     if (padding) {
         if (rc >= 0) {
-            /* Remove PKCS#7 padded chars */
+            /* Remove padding bytes. */
             Py_SET_SIZE(retval, rc);
         }
         else {
-            /* Illegal PKCS#7 padding */
             PyErr_SetString(PyExc_ValueError,
-                "Invalid data, illegal PKCS#7 padding. Could be using a wrong key.");
+                "Invalid data, illegal padding. Could be using a wrong key.");
             Py_DECREF(retval);
             retval = NULL;
         }
@@ -446,8 +443,8 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
 
 PyDoc_STRVAR(
     xxtea_encrypt_doc,
-    "encrypt (data, key, padding=True, rounds=0)\n\n"
-    "Encrypt `data` with a 16-byte `key`, return binary bytes.");
+    "encrypt(data, key, padding=True, rounds=0)\n\n"
+    "Encrypt bytes-like data with a 16-byte key and return bytes.");
 
 static PyObject *
 xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -471,8 +468,8 @@ xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 
 PyDoc_STRVAR(
     xxtea_encrypt_hex_doc,
-    "encrypt_hex (data, key, padding=True, rounds=0)\n\n"
-    "Encrypt `data` with a 16-byte `key`, return hex encoded bytes.");
+    "encrypt_hex(data, key, padding=True, rounds=0)\n\n"
+    "Encrypt bytes-like data with a 16-byte key and return hex-encoded bytes.");
 
 static PyObject *
 xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -508,8 +505,8 @@ xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
 
 PyDoc_STRVAR(
     xxtea_decrypt_doc,
-    "decrypt (data, key, padding=True, rounds=0)\n\n"
-    "Decrypt `data` with a 16-byte `key`, return original bytes.");
+    "decrypt(data, key, padding=True, rounds=0)\n\n"
+    "Decrypt bytes-like data with a 16-byte key and return bytes.");
 
 static PyObject *
 xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -533,8 +530,8 @@ xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 
 PyDoc_STRVAR(
     xxtea_decrypt_hex_doc,
-    "decrypt_hex (data, key, padding=True, rounds=0)\n\n"
-    "Decrypt hex encoded `data` with a 16-byte `key`, return original bytes.");
+    "decrypt_hex(data, key, padding=True, rounds=0)\n\n"
+    "Decrypt hex-encoded data with a 16-byte key and return bytes.");
 
 static PyObject *
 xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -547,7 +544,6 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
     if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
         return NULL;
 
-    /* Unhexlify hex string to bytes, then use shared buffer helper */
     xxtea_mod_state *state = (xxtea_mod_state*)PyModule_GetState(self);
     if (!state || !state->binascii_unhexlify) {
         PyErr_SetString(PyExc_RuntimeError, "module state not available");
