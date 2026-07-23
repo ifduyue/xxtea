@@ -216,6 +216,23 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
  * Module Functions ***********************************************************
  ****************************************************************************/
 
+typedef PyObject *(*xxtea_crypt_func)(const char *, Py_ssize_t,
+                                      const char *, int, unsigned int);
+
+static inline int
+_parse_rounds(PyObject *obj, unsigned int *rounds)
+{
+    unsigned long val = PyLong_AsUnsignedLong(obj);
+    if (val == (unsigned long)-1 && PyErr_Occurred())
+        return -1;
+    if (val > UINT_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+        return -1;
+    }
+    *rounds = (unsigned int)val;
+    return 0;
+}
+
 /*
  * Parse all arguments in a single pass.  Returns 0 on success, -1 on error.
  */
@@ -274,15 +291,8 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                 if (nargs > 3) { PyErr_SetString(PyExc_TypeError,
                     "argument 'rounds' given both as positional and keyword");
                     return -1; }
-                unsigned long val = PyLong_AsUnsignedLong(value);
-                if (val == (unsigned long)-1 && PyErr_Occurred())
+                if (_parse_rounds(value, rounds) < 0)
                     return -1;
-                if (val > UINT_MAX) {
-                    PyErr_SetString(PyExc_OverflowError,
-                        "rounds value too large");
-                    return -1;
-                }
-                *rounds = (unsigned int)val;
                 rounds_set = 1;
             }
             else {
@@ -300,14 +310,8 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
         *padding = res;
     }
     if (nargs > 3 && !rounds_set) {
-        unsigned long val = PyLong_AsUnsignedLong(args[3]);
-        if (val == (unsigned long)-1 && PyErr_Occurred())
+        if (_parse_rounds(args[3], rounds) < 0)
             return -1;
-        if (val > UINT_MAX) {
-            PyErr_SetString(PyExc_OverflowError, "rounds value too large");
-            return -1;
-        }
-        *rounds = (unsigned int)val;
     }
 
     if (!*data_obj || !*key_obj) {
@@ -317,6 +321,16 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
     }
 
     return 0;
+}
+
+static inline PyObject *
+_call_one_arg(PyObject *func, PyObject *arg)
+{
+    if (func == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "module state not available");
+        return NULL;
+    }
+    return PyObject_CallOneArg(func, arg);
 }
 
 /* Acquire buffers and validate key length. Returns 0 on success, -1 on error. */
@@ -337,6 +351,26 @@ _get_buffers(PyObject *data_obj, PyObject *key_obj,
         return -1;
     }
     return 0;
+}
+
+static inline PyObject *
+_call_module_crypt(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
+                   xxtea_crypt_func crypt)
+{
+    Py_buffer data = {NULL}, key = {NULL};
+    PyObject *data_obj, *key_obj;
+    int padding;
+    unsigned int rounds;
+
+    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
+        return NULL;
+    if (_get_buffers(data_obj, key_obj, &data, &key) < 0)
+        return NULL;
+
+    PyObject *retval = crypt(data.buf, data.len, key.buf, padding, rounds);
+    PyBuffer_Release(&data);
+    PyBuffer_Release(&key);
+    return retval;
 }
 
 /*
@@ -458,20 +492,7 @@ PyDoc_STRVAR(
 static PyObject *
 xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    Py_buffer data = {NULL}, key = {NULL};
-    PyObject *data_obj, *key_obj;
-    int padding;
-    unsigned int rounds;
-
-    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
-        return NULL;
-    if (_get_buffers(data_obj, key_obj, &data, &key) < 0)
-        return NULL;
-
-    PyObject *retval = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
-    PyBuffer_Release(&data);
-    PyBuffer_Release(&key);
-    return retval;
+    return _call_module_crypt(args, nargs, kwnames, _encrypt_impl);
 }
 
 
@@ -483,30 +504,12 @@ PyDoc_STRVAR(
 static PyObject *
 xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    Py_buffer data = {NULL}, key = {NULL};
-    PyObject *data_obj, *key_obj;
-    int padding;
-    unsigned int rounds;
-
-    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
-        return NULL;
-    if (_get_buffers(data_obj, key_obj, &data, &key) < 0)
-        return NULL;
-
-    PyObject *tmp = _encrypt_impl(data.buf, data.len, key.buf, padding, rounds);
-    PyBuffer_Release(&data);
-    PyBuffer_Release(&key);
-
+    PyObject *tmp = _call_module_crypt(args, nargs, kwnames, _encrypt_impl);
     if (!tmp)
         return NULL;
 
     xxtea_mod_state *state = (xxtea_mod_state*)PyModule_GetState(self);
-    if (!state || !state->binascii_hexlify) {
-        Py_DECREF(tmp);
-        PyErr_SetString(PyExc_RuntimeError, "module state not available");
-        return NULL;
-    }
-    PyObject *retval = PyObject_CallOneArg(state->binascii_hexlify, tmp);
+    PyObject *retval = _call_one_arg(state ? state->binascii_hexlify : NULL, tmp);
     Py_DECREF(tmp);
     return retval;
 }
@@ -520,20 +523,7 @@ PyDoc_STRVAR(
 static PyObject *
 xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
-    Py_buffer data = {NULL}, key = {NULL};
-    PyObject *data_obj, *key_obj;
-    int padding;
-    unsigned int rounds;
-
-    if (_parse_args(args, nargs, kwnames, &data_obj, &key_obj, &padding, &rounds) < 0)
-        return NULL;
-    if (_get_buffers(data_obj, key_obj, &data, &key) < 0)
-        return NULL;
-
-    PyObject *retval = _decrypt_impl(data.buf, data.len, key.buf, padding, rounds);
-    PyBuffer_Release(&data);
-    PyBuffer_Release(&key);
-    return retval;
+    return _call_module_crypt(args, nargs, kwnames, _decrypt_impl);
 }
 
 
@@ -554,11 +544,7 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
         return NULL;
 
     xxtea_mod_state *state = (xxtea_mod_state*)PyModule_GetState(self);
-    if (!state || !state->binascii_unhexlify) {
-        PyErr_SetString(PyExc_RuntimeError, "module state not available");
-        return NULL;
-    }
-    PyObject *tmp = PyObject_CallOneArg(state->binascii_unhexlify, data_obj);
+    PyObject *tmp = _call_one_arg(state ? state->binascii_unhexlify : NULL, data_obj);
     if (!tmp)
         return NULL;
 
@@ -586,6 +572,19 @@ typedef struct {
     unsigned int rounds;
     int padding;
 } xxtea_object;
+
+static PyObject *
+_call_object_crypt(xxtea_object *self, PyObject *data, xxtea_crypt_func crypt)
+{
+    Py_buffer data_buf = {NULL};
+    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
+        return NULL;
+
+    PyObject *retval = crypt(data_buf.buf, data_buf.len,
+                             self->key, self->padding, self->rounds);
+    PyBuffer_Release(&data_buf);
+    return retval;
+}
 
 /*
  * Manually parse XXTEA(key, padding=True, rounds=0) for both the
@@ -643,13 +642,8 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                         "argument 'rounds' given both as positional and keyword");
                     return -1;
                 }
-                unsigned long val = PyLong_AsUnsignedLong(value);
-                if (val == (unsigned long)-1 && PyErr_Occurred()) return -1;
-                if (val > UINT_MAX) {
-                    PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+                if (_parse_rounds(value, rounds) < 0)
                     return -1;
-                }
-                *rounds = (unsigned int)val;
             }
             else {
                 PyErr_Format(PyExc_TypeError,
@@ -666,13 +660,8 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
         *padding = res;
     }
     if (nargs > 2) {
-        unsigned long val = PyLong_AsUnsignedLong(args[2]);
-        if (val == (unsigned long)-1 && PyErr_Occurred()) return -1;
-        if (val > UINT_MAX) {
-            PyErr_SetString(PyExc_OverflowError, "rounds value too large");
+        if (_parse_rounds(args[2], rounds) < 0)
             return -1;
-        }
-        *rounds = (unsigned int)val;
     }
 
     if (!*key_obj) {
@@ -716,7 +705,6 @@ _apply_init_args(xxtea_object *self, PyObject *key_obj, int padding, unsigned in
 static int
 xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
 {
-
     PyObject *key_obj = NULL;
     int padding = 1;
     unsigned int rounds = 0;
@@ -769,8 +757,6 @@ static PyObject *
 xxtea_vectorcall(PyObject *type, PyObject *const *args,
                  size_t nargsf, PyObject *kwnames)
 {
-
-
     PyObject *key_obj = NULL;
     int padding = 1;
     unsigned int rounds = 0;
@@ -803,49 +789,24 @@ xxtea_object_dealloc(xxtea_object *self)
 static PyObject *
 xxtea_object_encrypt(xxtea_object *self, PyObject *data)
 {
-    Py_buffer data_buf = {NULL};
-    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
-        return NULL;
-
-    PyObject *retval = _encrypt_impl(data_buf.buf, data_buf.len,
-                                      self->key, self->padding, self->rounds);
-    PyBuffer_Release(&data_buf);
-    return retval;
+    return _call_object_crypt(self, data, _encrypt_impl);
 }
 
 static PyObject *
 xxtea_object_decrypt(xxtea_object *self, PyObject *data)
 {
-    Py_buffer data_buf = {NULL};
-    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
-        return NULL;
-
-    PyObject *retval = _decrypt_impl(data_buf.buf, data_buf.len,
-                                      self->key, self->padding, self->rounds);
-    PyBuffer_Release(&data_buf);
-    return retval;
+    return _call_object_crypt(self, data, _decrypt_impl);
 }
 
 static PyObject *
 xxtea_object_encrypt_hex(xxtea_object *self, PyObject *data)
 {
-    Py_buffer data_buf = {NULL};
-    if (PyObject_GetBuffer(data, &data_buf, PyBUF_SIMPLE) < 0)
-        return NULL;
-
-    PyObject *tmp = _encrypt_impl(data_buf.buf, data_buf.len,
-                                   self->key, self->padding, self->rounds);
-    PyBuffer_Release(&data_buf);
+    PyObject *tmp = _call_object_crypt(self, data, _encrypt_impl);
     if (!tmp)
         return NULL;
 
     xxtea_mod_state *state = PyType_GetModuleState(Py_TYPE(self));
-    if (!state || !state->binascii_hexlify) {
-        Py_DECREF(tmp);
-        PyErr_SetString(PyExc_RuntimeError, "module state not available");
-        return NULL;
-    }
-    PyObject *retval = PyObject_CallOneArg(state->binascii_hexlify, tmp);
+    PyObject *retval = _call_one_arg(state ? state->binascii_hexlify : NULL, tmp);
     Py_DECREF(tmp);
     return retval;
 }
@@ -854,23 +815,11 @@ static PyObject *
 xxtea_object_decrypt_hex(xxtea_object *self, PyObject *data)
 {
     xxtea_mod_state *state = PyType_GetModuleState(Py_TYPE(self));
-    if (!state || !state->binascii_unhexlify) {
-        PyErr_SetString(PyExc_RuntimeError, "module state not available");
-        return NULL;
-    }
-    PyObject *tmp = PyObject_CallOneArg(state->binascii_unhexlify, data);
+    PyObject *tmp = _call_one_arg(state ? state->binascii_unhexlify : NULL, data);
     if (!tmp)
         return NULL;
 
-    Py_buffer data_buf = {NULL};
-    if (PyObject_GetBuffer(tmp, &data_buf, PyBUF_SIMPLE) < 0) {
-        Py_DECREF(tmp);
-        return NULL;
-    }
-
-    PyObject *retval = _decrypt_impl(data_buf.buf, data_buf.len,
-                                      self->key, self->padding, self->rounds);
-    PyBuffer_Release(&data_buf);
+    PyObject *retval = _call_object_crypt(self, tmp, _decrypt_impl);
     Py_DECREF(tmp);
     return retval;
 }
