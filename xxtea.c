@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define VERSION "4.0.1"
+#define VERSION "4.0.2"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
@@ -590,6 +590,7 @@ xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
     }
     tmp = PyObject_CallOneArg(state->binascii_unhexlify, data_obj);
     if (!tmp)
+        return NULL;
 
     /* Get buffers from unhexlified data and key */
     if (PyObject_GetBuffer(tmp, &data, PyBUF_SIMPLE) < 0) {
