@@ -1,6 +1,14 @@
 CHANGELOG
 --------------
 
+v5.3.2 2026/07/24
+~~~~~~~~~~~~~~~~~~~
+
+- Clarify XXTEA comments and docstrings.
+- Extract internal XXTEA C helpers to reduce duplication.
+- Simplify PKCS#7 padding validation to a byte-by-byte comparison.
+- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
+
 v5.3.1 2026/06/30
 ~~~~~~~~~~~~~~~~~~~
 
