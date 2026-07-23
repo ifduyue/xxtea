@@ -112,19 +112,17 @@ static int bytes2longs(const char *in, int inlen, unsigned int *out, int padding
         out[i >> 2] |= s[i] << ((i & 3) << 3);
     }
 
-    /* PKCS#7 padding */
+    /* 4-byte PKCS#7-style padding; short inputs are padded to two words. */
     if (padding) {
         pad = 4 - (inlen & 3);
-        /* make sure lenght of out >= 2 */
+        /* Ensure XXTEA always has at least two 32-bit words. */
         pad = (inlen < 4) ? pad + 4 : pad;
         for (i = inlen; i < inlen + pad; i++) {
             out[i >> 2] |= pad << ((i & 3) << 3);
         }
     }
 
-    /* Divided by 4, and then rounded up (ceil) to an integer.
-     * Which is the number of how many longs we've got.
-     */
+    /* Return the number of 32-bit words, rounded up from bytes. */
     return ((i - 1) >> 2) + 1;
 }
 
@@ -144,7 +142,7 @@ static int longs2bytes(unsigned int *in, int inlen, char *out, int padding)
 
     outlen = inlen * 4;
 
-    /* PKCS#7 unpadding */
+    /* 4-byte PKCS#7-style unpadding. */
     if (padding) {
         pad = s[outlen - 1];
         outlen -= pad;
@@ -180,8 +178,8 @@ static char *keywords[] = {"data", "key", "padding", "rounds", NULL};
 
 PyDoc_STRVAR(
     xxtea_encrypt_doc,
-    "encrypt (data, key, padding=True, rounds=0)\n\n"
-    "Encrypt `data` with a 16-byte `key`, return binary bytes.");
+    "encrypt(data, key, padding=True, rounds=0)\n\n"
+    "Encrypt bytes-like data with a 16-byte key and return bytes.");
 
 static PyObject *xxtea_encrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -256,8 +254,8 @@ cleanup:
 
 PyDoc_STRVAR(
     xxtea_encrypt_hex_doc,
-    "encrypt_hex (data, key, padding=True, rounds=0)\n\n"
-    "Encrypt `data` with a 16-byte `key`, return hex encoded bytes.");
+    "encrypt_hex(data, key, padding=True, rounds=0)\n\n"
+    "Encrypt bytes-like data with a 16-byte key and return hex-encoded bytes.");
 
 static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -278,8 +276,8 @@ static PyObject *xxtea_encrypt_hex(PyObject *self, PyObject *args, PyObject *kwa
 
 PyDoc_STRVAR(
     xxtea_decrypt_doc,
-    "decrypt (data, key, padding=True, rounds=0)\n\n"
-    "Decrypt `data` with a 16-byte `key`, return original bytes.");
+    "decrypt(data, key, padding=True, rounds=0)\n\n"
+    "Decrypt bytes-like data with a 16-byte key and return bytes.");
 
 static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -349,12 +347,11 @@ static PyObject *xxtea_decrypt(PyObject *self, PyObject *args, PyObject *kwargs)
 
     if (padding) {
         if (rc >= 0) {
-            /* Remove PKCS#7 padded chars */
+            /* Remove padding bytes. */
             Py_SET_SIZE(retval, rc);
         }
         else {
-            /* Illegal PKCS#7 padding */
-            PyErr_SetString(PyExc_ValueError, "Invalid data, illegal PKCS#7 padding. Could be using a wrong key.");
+            PyErr_SetString(PyExc_ValueError, "Invalid data, illegal padding. Could be using a wrong key.");
             goto cleanup;
         }
     }
@@ -373,8 +370,8 @@ cleanup:
 
 PyDoc_STRVAR(
     xxtea_decrypt_hex_doc,
-    "decrypt_hex (data, key, padding = True)\n\n"
-    "Decrypt hex encoded `data` with a 16-byte `key`, return original bytes.");
+    "decrypt_hex(data, key, padding=True)\n\n"
+    "Decrypt hex-encoded data with a 16-byte key and return bytes.");
 
 static PyObject *xxtea_decrypt_hex(PyObject *self, PyObject *args, PyObject *kwargs)
 {
