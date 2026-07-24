@@ -98,15 +98,26 @@ jobs:
 
 
   upload_test_pypi:
-    name: Upload to Test PyPI
+    name: Upload to Test PyPI (${{ matrix.group }})
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-24.04
     if: github.event_name == 'push' && github.repository == 'ifduyue/xxtea' && !startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        group:
+          - 1-of-5
+          - 2-of-5
+          - 3-of-5
+          - 4-of-5
+          - 5-of-5
     environment:
       name: test-pypi
       url: https://test.pypi.org/project/xxtea/
     permissions:
       id-token: write
+    env:
+      TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -114,9 +125,27 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Select this group's distributions
+        run: |
+          set -euo pipefail
+          index=$(( $(echo "${{ matrix.group }}" | cut -d- -f1) - 1 ))
+          count=$(echo "${{ matrix.group }}" | cut -d- -f3)
+          mkdir -p dist_group
+          shopt -s nullglob
+          mapfile -t all < <(printf '%s\n' dist/*.whl dist/*.tar.gz | LC_ALL=C sort)
+          i=0
+          for f in "${all[@]}"; do
+            if [ "$(( i % count ))" -eq "${index}" ]; then
+              mv -- "$f" dist_group/
+            fi
+            i=$(( i + 1 ))
+          done
+          echo "Group ${index} of ${count}: ${#all[@]} dists total, kept $(ls dist_group | wc -l) dist(s)"
+
       - name: Upload to Test PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
         with:
+          packages-dir: dist_group
           skip-existing: true
           repository-url: https://test.pypi.org/legacy/
 
@@ -129,9 +158,11 @@ jobs:
       fail-fast: false
       matrix:
         group:
-          - 1-of-3
-          - 2-of-3
-          - 3-of-3
+          - 1-of-5
+          - 2-of-5
+          - 3-of-5
+          - 4-of-5
+          - 5-of-5
     environment:
       name: pypi
       url: https://pypi.org/project/xxtea/
