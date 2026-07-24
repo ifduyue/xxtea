@@ -230,4 +230,4 @@ jobs:
       - name: Upload assets to GitHub Release
         uses: softprops/action-gh-release@v3.0.2
         with:
-          files: dist_group/*
+          files: dist_group/*.whl dist_group/*.tar.gz
