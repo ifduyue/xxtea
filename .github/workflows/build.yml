@@ -158,9 +158,11 @@ jobs:
       fail-fast: false
       matrix:
         group:
-          - 1-of-3
-          - 2-of-3
-          - 3-of-3
+          - 1-of-5
+          - 2-of-5
+          - 3-of-5
+          - 4-of-5
+          - 5-of-5
     environment:
       name: pypi
       url: https://pypi.org/project/xxtea/
