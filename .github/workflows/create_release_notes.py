@@ -18,8 +18,13 @@ pattern = r'^' + escaped + r'.*?(?=^v[\d.]+ [\d/]+|\Z)'
 m = re.search(pattern, text, re.MULTILINE | re.DOTALL)
 if m:
     notes = m.group(0).strip()
+    # Convert RST-style heading (line + underline) to Markdown heading.
+    # e.g. "v5.3.2 2026/07/24\n~~~~~~~~~~~~~~~~~~~" -> "## v5.3.2 2026/07/24"
+    lines = notes.splitlines()
+    if len(lines) >= 2 and set(lines[1]) <= set('~=-^'):
+        notes = '## ' + lines[0] + '\n' + '\n'.join(lines[2:])
 else:
-    notes = 'Release ' + tag
+    notes = '## Release ' + tag
 
 # Find previous version in the same major.minor series for changelog link
 prefix = tag.rsplit('.', 1)[0]
