@@ -1,6 +1,15 @@
 CHANGELOG
 --------------
 
+v5.3.3 2026/08/14
+~~~~~~~~~~~~~~~~~~~
+
+- Assemble leftover data and PKCS#7 padding into complete words in
+  ``bytes2longs``, so ``encrypt()`` no longer needs to zero the output
+  buffer first.
+- Add Python 3.15 classifier.
+- Pin GitHub Actions to commit SHAs.
+
 v5.3.2 2026/07/24
 ~~~~~~~~~~~~~~~~~~~
 
