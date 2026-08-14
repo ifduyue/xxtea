@@ -1,7 +1,7 @@
 CHANGELOG
 --------------
 
-v4.0.3 2026/08/14
+v4.0.4 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
 
 - Assemble leftover data and PKCS#7 padding into complete words in
