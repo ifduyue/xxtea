@@ -1,6 +1,12 @@
 CHANGELOG
 --------------
 
+v5.0.5 2026/08/14
+~~~~~~~~~~~~~~~~~~~
+
+- Assemble leftover data and PKCS#7 padding into complete words in
+  ``bytes2longs``, so every used output word is written in full.
+
 v5.0.2 2026/07/24
 ~~~~~~~~~~~~~~~~~~~
 

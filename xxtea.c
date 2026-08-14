@@ -29,7 +29,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "5.0.5.dev3"
+#define VERSION "5.0.5"
 
 #if PY_VERSION_HEX < 0x030900A4 && !defined(Py_SET_SIZE)
 static inline void _Py_SET_SIZE(PyVarObject *ob, Py_ssize_t size)
@@ -91,16 +91,14 @@ static inline void btea(uint32_t *v, int n, uint32_t const key[4], unsigned int 
     }
 }
 
-static Py_ssize_t bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, int padding)
+static void bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, int padding)
 {
-    Py_ssize_t i;
+    Py_ssize_t i, nwords;
     int pad;
-    const unsigned char *s;
-
-    s = (const unsigned char *)in;
+    const unsigned char *s = (const unsigned char *)in;
 
     /* Fast path: process 4 bytes at a time */
-    Py_ssize_t nwords = inlen >> 2;
+    nwords = inlen >> 2;
     for (i = 0; i < nwords; i++) {
 #if PY_LITTLE_ENDIAN
         memcpy(&out[i], s + 4 * i, 4);
@@ -111,24 +109,34 @@ static Py_ssize_t bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, i
 #endif
     }
 
-    /* Handle remaining 0-3 bytes */
+    /*
+     * Assemble the final partial word (0-3 leftover data bytes plus
+     * padding) in a local and store it with a single write, so every
+     * output byte is written exactly once and the caller does not need
+     * to zero the buffer first.  Inputs shorter than 4 bytes are padded
+     * to two words, which also guarantees the minimum XXTEA block size.
+     */
     i = nwords << 2;
-    for (; i < inlen; i++) {
-        out[i >> 2] |= (uint32_t)s[i] << ((i & 3) << 3);
-    }
-
-    /* 4-byte PKCS#7-style padding; short inputs are padded to two words. */
-    if (padding) {
-        pad = 4 - (inlen & 3);
-        /* Ensure XXTEA always has at least two 32-bit words. */
-        pad = (inlen < 4) ? pad + 4 : pad;
-        for (; i < inlen + pad; i++) {
-            out[i >> 2] |= (uint32_t)pad << ((i & 3) << 3);
+    if (padding || (inlen & 3) != 0) {
+        uint32_t w = 0;
+        int r = (int)(inlen & 3);
+        int shift = 0;
+        for (; i < inlen; i++, shift += 8) {
+            w |= (uint32_t)s[i] << shift;
         }
+        if (padding) {
+            pad = 4 - r;
+            /* Ensure XXTEA always has at least two 32-bit words. */
+            if (inlen < 4) {
+                pad += 4;
+            }
+            w |= (uint32_t)pad * 0x01010101u & (~0u << (8 * r));
+            if (inlen < 4) {
+                out[nwords + 1] = (uint32_t)pad * 0x01010101u;
+            }
+        }
+        out[nwords] = w;
     }
-
-    /* Return the number of 32-bit words, rounded up from bytes. */
-    return ((i - 1) >> 2) + 1;
 }
 
 static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, int padding)
@@ -420,7 +428,6 @@ static inline PyObject *
 _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
               const char *key_buf, int padding, unsigned int rounds)
 {
-    uint32_t *d = NULL;
     uint32_t k[4] = {0};
 
     if (data_len & 3 || data_len < 8) {
@@ -441,20 +448,14 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         Py_DECREF(retval);
         return NULL;
     }
-    d = (uint32_t *)calloc((size_t)alen, sizeof(uint32_t));
-
-    if (d == NULL) {
-        Py_DECREF(retval);
-        return PyErr_NoMemory();
-    }
 
     char *retbuf = PyBytes_AsString(retval);
     Py_ssize_t rc;
     Py_BEGIN_ALLOW_THREADS
-    bytes2longs(data_buf, data_len, d, 0);
+    bytes2longs(data_buf, data_len, (uint32_t *)retbuf, 0);
     bytes2longs(key_buf, 16, k, 0);
-    btea(d, -(int)alen, k, rounds);
-    rc = longs2bytes(d, alen, retbuf, padding);
+    btea((uint32_t *)retbuf, -(int)alen, k, rounds);
+    rc = longs2bytes((uint32_t *)retbuf, alen, retbuf, padding);
     Py_END_ALLOW_THREADS
 
     if (padding) {
@@ -470,7 +471,6 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
         }
     }
 
-    free(d);
     return retval;
 }
 
