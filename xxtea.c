@@ -137,42 +137,24 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
 {
     Py_ssize_t i, outlen;
     int pad;
-    unsigned char *s;
+    unsigned char *s = (unsigned char *)out;
 
-    s = (unsigned char *)out;
-
+#if PY_LITTLE_ENDIAN
+    /* Callers always pass the same buffer; words are already LE bytes. */
+    (void)in;
+#else
     /*
-     * In-place path: used by _decrypt_impl where `out` is the same PyBytes
-     * buffer that already holds the uint32_t words.
-     * - Little endian: the byte representation is already correct, nothing to do.
-     * - Big endian: swap each word's bytes.  Read the whole word into a local
-     *   variable before writing any of its bytes, because in and s alias.
+     * Big endian: write each word as little-endian bytes.  Snapshot the
+     * whole word first because in and out alias.
      */
-    if (in == (const uint32_t *)out) {
-#if PY_LITTLE_ENDIAN
-        /* No byte swap needed. */
-#else
-        for (i = 0; i < inlen; i++) {
-            uint32_t word = in[i];
-            s[4 * i] = (unsigned char)(word & 0xFF);
-            s[4 * i + 1] = (unsigned char)((word >> 8) & 0xFF);
-            s[4 * i + 2] = (unsigned char)((word >> 16) & 0xFF);
-            s[4 * i + 3] = (unsigned char)((word >> 24) & 0xFF);
-        }
-#endif
+    for (i = 0; i < inlen; i++) {
+        uint32_t word = in[i];
+        s[4 * i]     = (unsigned char)(word & 0xFF);
+        s[4 * i + 1] = (unsigned char)((word >> 8) & 0xFF);
+        s[4 * i + 2] = (unsigned char)((word >> 16) & 0xFF);
+        s[4 * i + 3] = (unsigned char)((word >> 24) & 0xFF);
     }
-    else {
-        for (i = 0; i < inlen; i++) {
-#if PY_LITTLE_ENDIAN
-            memcpy(s + 4 * i, &in[i], 4);
-#else
-            s[4 * i] = (unsigned char)(in[i] & 0xFF);
-            s[4 * i + 1] = (unsigned char)((in[i] >> 8) & 0xFF);
-            s[4 * i + 2] = (unsigned char)((in[i] >> 16) & 0xFF);
-            s[4 * i + 3] = (unsigned char)((in[i] >> 24) & 0xFF);
 #endif
-        }
-    }
 
     outlen = inlen * 4;
 
@@ -199,7 +181,6 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
 
     s[outlen] = '\0';
 
-    /* How many bytes we've got */
     return outlen;
 }
 
