@@ -27,34 +27,6 @@ v5.3.1 2026/06/30
 - Fix ``longs2bytes`` in-place handling on big-endian hosts.
 - Add s390x big-endian CI job and regression test.
 
-v5.2.2 2026/07/24
-~~~~~~~~~~~~~~~~~~~
-
-- Clarify XXTEA comments and docstrings.
-- Extract internal XXTEA C helpers to reduce duplication.
-- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
-
-v5.1.2 2026/07/24
-~~~~~~~~~~~~~~~~~~~
-
-- Clarify XXTEA comments and docstrings.
-- Extract internal XXTEA C helpers to reduce duplication.
-- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
-
-v5.0.2 2026/07/24
-~~~~~~~~~~~~~~~~~~~
-
-- Clarify XXTEA comments and docstrings.
-- Extract internal XXTEA C helpers to reduce duplication.
-- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
-
-v4.0.2 2026/07/24
-~~~~~~~~~~~~~~~~~~~
-
-- Clarify XXTEA comments and docstrings.
-- Extract internal XXTEA C helpers to reduce duplication.
-- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
-
 v5.3.0 2026/06/29
 ~~~~~~~~~~~~~~~~~~~
 
@@ -68,6 +40,19 @@ v5.3.0 2026/06/29
 - Unify ``rounds`` parsing between module functions and the :class:`XXTEA`
   constructor, both now use ``PyLong_AsUnsignedLong`` with an immediate
   ``UINT_MAX`` check.
+
+v5.2.3 2026/08/14
+~~~~~~~~~~~~~~~~~~~
+
+- Assemble leftover data and PKCS#7 padding into complete words in
+  ``bytes2longs``, so every used output word is written in full.
+
+v5.2.2 2026/07/24
+~~~~~~~~~~~~~~~~~~~
+
+- Clarify XXTEA comments and docstrings.
+- Extract internal XXTEA C helpers to reduce duplication.
+- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
 
 v5.2.1 2026/06/30
 ~~~~~~~~~~~~~~~~~~~
@@ -85,6 +70,19 @@ v5.2.0 2026/06/19
   up to 2.9× faster for keyword arguments.
 - Rewrite argument parsing to share logic between vectorcall and ``tp_init``.
 
+v5.1.3 2026/08/14
+~~~~~~~~~~~~~~~~~~~
+
+- Assemble leftover data and PKCS#7 padding into complete words in
+  ``bytes2longs``, so every used output word is written in full.
+
+v5.1.2 2026/07/24
+~~~~~~~~~~~~~~~~~~~
+
+- Clarify XXTEA comments and docstrings.
+- Extract internal XXTEA C helpers to reduce duplication.
+- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
+
 v5.1.1 2026/06/30
 ~~~~~~~~~~~~~~~~~~~
 
@@ -99,6 +97,19 @@ v5.1.0 2026/06/15
 
 - Build Pyodide (Emscripten/WASM) wheels.
 - Drop ``Py_SET_SIZE`` polyfill (no longer needed since Python ≥ 3.9).
+
+v5.0.5 2026/08/14
+~~~~~~~~~~~~~~~~~~~
+
+- Assemble leftover data and PKCS#7 padding into complete words in
+  ``bytes2longs``, so every used output word is written in full.
+
+v5.0.2 2026/07/24
+~~~~~~~~~~~~~~~~~~~
+
+- Clarify XXTEA comments and docstrings.
+- Extract internal XXTEA C helpers to reduce duplication.
+- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
 
 v5.0.1 2026/06/30
 ~~~~~~~~~~~~~~~~~~~
@@ -124,6 +135,19 @@ v5.0.0 2026/05/08
 - Document non-standard 4-byte block PKCS#7 padding behaviour in README,
   including the ``pad+4`` hack for inputs < 4 bytes and compatibility note.
 - Add 4-byte and 8-byte edge case tests for non-standard PKCS#7 padding.
+
+v4.0.4 2026/08/14
+~~~~~~~~~~~~~~~~~~~
+
+- Assemble leftover data and PKCS#7 padding into complete words in
+  ``bytes2longs``, so every used output word is written in full.
+
+v4.0.2 2026/07/24
+~~~~~~~~~~~~~~~~~~~
+
+- Clarify XXTEA comments and docstrings.
+- Extract internal XXTEA C helpers to reduce duplication.
+- Pin ``pypa/gh-action-pypi-publish`` to a specific SHA in CI.
 
 v4.0.1 2026/06/30
 ~~~~~~~~~~~~~~~~~~~
@@ -164,12 +188,10 @@ v3.6.0 2025/11/04
 - Build Android and iOS wheels
 - Build pypy and pypy-eol wheels
 
-
 v3.5.0 2025/10/02
 ~~~~~~~~~~~~~~~~~~~
 
 - Support Python Free Threading
-
 
 v3.4.0 2025/10/01
 ~~~~~~~~~~~~~~~~~~~
@@ -177,12 +199,10 @@ v3.4.0 2025/10/01
 - Build wheels for Python 3.14
 - Drop support for Python 3.6
 
-
 v3.3.0 2024/08/09
 ~~~~~~~~~~~~~~~~~~~
 
 - Build wheels for Python 3.13
-
 
 v3.2.0 2023/10/06
 ~~~~~~~~~~~~~~~~~~~
