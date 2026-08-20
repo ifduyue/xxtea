@@ -1,6 +1,21 @@
 CHANGELOG
 --------------
 
+v6.0.0.dev0
+~~~~~~~~~~~~~~~~~~~
+
+- Add ``xxtea.Padding`` ``str`` enum: ``PKCS7_4_MIN8`` (default),
+  ``PKCS7_8``, and ``NONE``. ``True`` / ``False`` / ``None`` and the
+  string names remain accepted. Unknown scheme names raise ``ValueError``.
+- ``padding=None`` disables padding (same as ``False``), matching 5.3.3.
+- Deprecate other truthy/falsy padding values (``0``, ``1``, ``""``,
+  empty containers, etc.). They still work but warn, and will be
+  removed in the next major version.
+- ``Padding.PKCS7_8`` is standard 8-byte PKCS#7, compatible with Python
+  `xxteang <https://github.com/ifduyue/xxteang>`_.
+- ``xxtea.PKCS7_4_MIN8`` and ``xxtea.PKCS7_8`` (also ``XXTEA.PKCS7_*``)
+  are aliases for the enum members.
+
 v5.3.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
 

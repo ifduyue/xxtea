@@ -22,6 +22,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
+ * Default ciphertext uses "pkcs7_4_min8" padding (4-byte PKCS#7-like, pad+4
+ * for inputs shorter than 4 bytes).  padding="pkcs7_8" uses 8-byte PKCS#7,
+ * compatible with Python xxteang (https://github.com/ifduyue/xxteang).
  */
 
 
@@ -29,7 +32,13 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "5.3.3"
+#define VERSION "6.0.0.dev0"
+
+enum {
+    XXTEA_PADDING_NONE = 0,
+    XXTEA_PADDING_PKCS7_4_MIN8 = 4,
+    XXTEA_PADDING_PKCS7_8 = 8,
+};
 
 #define DELTA 0x9e3779b9U
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
@@ -103,24 +112,45 @@ static void bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, int pad
 #endif
     }
 
-    /*
-     * Assemble the final partial word (0-3 leftover data bytes plus
-     * padding) in a local and store it with a single write, so every
-     * output byte is written exactly once and the caller does not need
-     * to zero the buffer first.  Inputs shorter than 4 bytes are padded
-     * to two words, which also guarantees the minimum XXTEA block size.
-     */
     i = nwords << 2;
-    if (padding || (inlen & 3) != 0) {
+
+    if (padding == XXTEA_PADDING_PKCS7_8) {
+        /*
+         * 8-byte PKCS#7 (xxteang): pad = 8 - (len & 7), range 1-8.
+         * Completes the partial word, then adds a whole extra pad word
+         * unless the length is 4 mod 8.
+         */
+        uint32_t w = 0;
+        int r = (int)(inlen & 3);
+        int shift = 0;
+        uint32_t pw;
+        for (; i < inlen; i++, shift += 8) {
+            w |= (uint32_t)s[i] << shift;
+        }
+        pad = 8 - (int)(inlen & 7);
+        pw = (uint32_t)pad * 0x01010101u;
+        w |= pw & (~0u << (8 * r));
+        out[nwords] = w;
+        if ((inlen & 4) == 0) {
+            out[nwords + 1] = pw;
+        }
+        return;
+    }
+
+    /*
+     * pkcs7_4_min8 (default): 4-byte PKCS#7-like, but inputs shorter
+     * than 4 bytes are padded to two words (pad values 5-8) for XXTEA's
+     * 2-word minimum.  Not standard PKCS#7.
+     */
+    if (padding == XXTEA_PADDING_PKCS7_4_MIN8 || (inlen & 3) != 0) {
         uint32_t w = 0;
         int r = (int)(inlen & 3);
         int shift = 0;
         for (; i < inlen; i++, shift += 8) {
             w |= (uint32_t)s[i] << shift;
         }
-        if (padding) {
+        if (padding == XXTEA_PADDING_PKCS7_4_MIN8) {
             pad = 4 - r;
-            /* Ensure XXTEA always has at least two 32-bit words. */
             if (inlen < 4) {
                 pad += 4;
             }
@@ -158,7 +188,7 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
 
     outlen = inlen * 4;
 
-    /* 4-byte PKCS#7-style unpadding. */
+    /* PKCS#7-style unpadding (4-byte or 8-byte; pad values 1-8). */
     if (padding) {
         pad = s[outlen - 1];
         outlen -= pad;
@@ -205,6 +235,86 @@ _parse_rounds(PyObject *obj, unsigned int *rounds)
     return 0;
 }
 
+static int
+_warn_legacy_padding(PyObject *obj)
+{
+    return PyErr_WarnFormat(
+        PyExc_DeprecationWarning, 1,
+        "padding=%R is deprecated; use True, False, None, or xxtea.Padding "
+        "(PKCS7_4_MIN8, PKCS7_8, NONE). "
+        "This will be removed in the next major version.",
+        obj);
+}
+
+static inline int
+_parse_padding_name(PyObject *name, int *padding)
+{
+    if (PyUnicode_GET_LENGTH(name) == 0) {
+        if (_warn_legacy_padding(name) < 0)
+            return -1;
+        *padding = XXTEA_PADDING_NONE;
+        return 0;
+    }
+    if (PyUnicode_CompareWithASCIIString(name, "pkcs7_4_min8") == 0) {
+        *padding = XXTEA_PADDING_PKCS7_4_MIN8;
+        return 0;
+    }
+    if (PyUnicode_CompareWithASCIIString(name, "pkcs7_8") == 0) {
+        *padding = XXTEA_PADDING_PKCS7_8;
+        return 0;
+    }
+    if (PyUnicode_CompareWithASCIIString(name, "none") == 0) {
+        *padding = XXTEA_PADDING_NONE;
+        return 0;
+    }
+    PyErr_Format(PyExc_ValueError,
+        "unknown padding %R (expected Padding.NONE, Padding.PKCS7_4_MIN8, "
+        "or Padding.PKCS7_8)",
+        name);
+    return -1;
+}
+
+static inline int
+_parse_padding(PyObject *obj, int *padding)
+{
+    if (obj == Py_True) {
+        *padding = XXTEA_PADDING_PKCS7_4_MIN8;
+        return 0;
+    }
+    if (obj == Py_False || obj == Py_None) {
+        *padding = XXTEA_PADDING_NONE;
+        return 0;
+    }
+    if (PyUnicode_Check(obj)) {
+        return _parse_padding_name(obj, padding);
+    }
+
+    /* Padding enum members (and any enum-like object with a str .value). */
+    PyObject *value = PyObject_GetAttrString(obj, "value");
+    if (value != NULL) {
+        int rc;
+        if (PyUnicode_Check(value)) {
+            rc = _parse_padding_name(value, padding);
+            Py_DECREF(value);
+            return rc;
+        }
+        Py_DECREF(value);
+    }
+    else {
+        PyErr_Clear();
+    }
+
+    /* Historical: any other object uses truthiness (0/empty → none,
+     * 1/nonempty → pkcs7_4_min8).  Deprecated; removed in the next major. */
+    if (_warn_legacy_padding(obj) < 0)
+        return -1;
+    int res = PyObject_IsTrue(obj);
+    if (res < 0)
+        return -1;
+    *padding = res ? XXTEA_PADDING_PKCS7_4_MIN8 : XXTEA_PADDING_NONE;
+    return 0;
+}
+
 /*
  * Parse all arguments in a single pass.  Returns 0 on success, -1 on error.
  */
@@ -216,7 +326,7 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
     int data_set = 0, key_set = 0, padding_set = 0, rounds_set = 0;
 
     *data_obj = *key_obj = NULL;
-    *padding = 1;
+    *padding = XXTEA_PADDING_PKCS7_4_MIN8;
     *rounds = 0;
 
     /* Positional: data, key */
@@ -254,9 +364,8 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                 if (nargs > 2) { PyErr_SetString(PyExc_TypeError,
                     "argument 'padding' given both as positional and keyword");
                     return -1; }
-                int res = PyObject_IsTrue(value);
-                if (res < 0) return -1;
-                *padding = res;
+                if (_parse_padding(value, padding) < 0)
+                    return -1;
                 padding_set = 1;
             }
             else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
@@ -277,9 +386,8 @@ _parse_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
 
     /* Positional: padding, rounds (only if not set via keyword) */
     if (nargs > 2 && !padding_set) {
-        int res = PyObject_IsTrue(args[2]);
-        if (res < 0) return -1;
-        *padding = res;
+        if (_parse_padding(args[2], padding) < 0)
+            return -1;
     }
     if (nargs > 3 && !rounds_set) {
         if (_parse_rounds(args[3], rounds) < 0)
@@ -363,7 +471,20 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
         return NULL;
     }
 
-    Py_ssize_t alen = data_len < 4 ? 2 : (data_len >> 2) + padding;
+    Py_ssize_t alen;
+    if (padding == XXTEA_PADDING_PKCS7_8) {
+        if (data_len > PY_SSIZE_T_MAX - 8) {
+            PyErr_SetString(PyExc_OverflowError, "data too large");
+            return NULL;
+        }
+        alen = ((data_len & ~(Py_ssize_t)7) + 8) >> 2;
+    }
+    else if (padding == XXTEA_PADDING_PKCS7_4_MIN8) {
+        alen = data_len < 4 ? 2 : (data_len >> 2) + 1;
+    }
+    else {
+        alen = data_len >> 2;
+    }
     if (alen > INT_MAX) {
         PyErr_SetString(PyExc_OverflowError, "data too large");
         return NULL;
@@ -454,7 +575,9 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
 PyDoc_STRVAR(
     xxtea_encrypt_doc,
     "encrypt(data, key, padding=True, rounds=0)\n\n"
-    "Encrypt bytes-like data with a 16-byte key and return bytes.");
+    "Encrypt bytes-like data with a 16-byte key and return bytes.\n"
+    "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
+    "or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -466,7 +589,9 @@ xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 PyDoc_STRVAR(
     xxtea_encrypt_hex_doc,
     "encrypt_hex(data, key, padding=True, rounds=0)\n\n"
-    "Encrypt bytes-like data with a 16-byte key and return hex-encoded bytes.");
+    "Encrypt bytes-like data with a 16-byte key and return hex-encoded bytes.\n"
+    "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
+    "or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -485,7 +610,9 @@ xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObj
 PyDoc_STRVAR(
     xxtea_decrypt_doc,
     "decrypt(data, key, padding=True, rounds=0)\n\n"
-    "Decrypt bytes-like data with a 16-byte key and return bytes.");
+    "Decrypt bytes-like data with a 16-byte key and return bytes.\n"
+    "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
+    "or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -497,7 +624,9 @@ xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject 
 PyDoc_STRVAR(
     xxtea_decrypt_hex_doc,
     "decrypt_hex(data, key, padding=True, rounds=0)\n\n"
-    "Decrypt hex-encoded data with a 16-byte key and return bytes.");
+    "Decrypt hex-encoded data with a 16-byte key and return bytes.\n"
+    "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
+    "or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -565,7 +694,7 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
     int key_set = 0;
 
     *key_obj = NULL;
-    *padding = 1;
+    *padding = XXTEA_PADDING_PKCS7_4_MIN8;
     *rounds = 0;
 
     if (nargs > 3) {
@@ -599,9 +728,8 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
                         "argument 'padding' given both as positional and keyword");
                     return -1;
                 }
-                int res = PyObject_IsTrue(value);
-                if (res < 0) return -1;
-                *padding = res;
+                if (_parse_padding(value, padding) < 0)
+                    return -1;
             }
             else if (PyUnicode_CompareWithASCIIString(name, "rounds") == 0) {
                 if (nargs > 2) {
@@ -622,9 +750,8 @@ _parse_init_args(PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames,
 
     /* Positional: padding, rounds (keyword conflicts already caught above) */
     if (nargs > 1) {
-        int res = PyObject_IsTrue(args[1]);
-        if (res < 0) return -1;
-        *padding = res;
+        if (_parse_padding(args[1], padding) < 0)
+            return -1;
     }
     if (nargs > 2) {
         if (_parse_rounds(args[2], rounds) < 0)
@@ -673,7 +800,7 @@ static int
 xxtea_object_init(xxtea_object *self, PyObject *args, PyObject *kwargs)
 {
     PyObject *key_obj = NULL;
-    int padding = 1;
+    int padding = XXTEA_PADDING_PKCS7_4_MIN8;
     unsigned int rounds = 0;
 
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
@@ -725,7 +852,7 @@ xxtea_vectorcall(PyObject *type, PyObject *const *args,
                  size_t nargsf, PyObject *kwnames)
 {
     PyObject *key_obj = NULL;
-    int padding = 1;
+    int padding = XXTEA_PADDING_PKCS7_4_MIN8;
     unsigned int rounds = 0;
     Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
 
@@ -813,6 +940,8 @@ static PyType_Slot xxtea_type_slots[] = {
     {Py_tp_doc, (void *)"XXTEA(key, padding=True, rounds=0)\n\n"
                 "XXTEA cipher object.  rounds=0 means auto: 6 + 52 / n, "
                 "where n is the number of 32-bit words in the data.\n"
+                "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
+                "or False/None/Padding.NONE.\n"
                 "Methods: encrypt(data), decrypt(data), "
                 "encrypt_hex(data), decrypt_hex(data)."},
     {Py_tp_methods, xxtea_object_methods},
@@ -824,17 +953,68 @@ static PyType_Slot xxtea_type_slots[] = {
 static PyType_Spec xxtea_type_spec = {
     .name = "xxtea.XXTEA",
     .basicsize = sizeof(xxtea_object),
-    .flags = Py_TPFLAGS_DEFAULT
-#if PY_VERSION_HEX >= 0x030c0000
-           | Py_TPFLAGS_IMMUTABLETYPE
-#endif
-           ,
+    .flags = Py_TPFLAGS_DEFAULT,
     .slots = xxtea_type_slots,
 };
 
 /*****************************************************************************
  * Module Init ****************************************************************
  ****************************************************************************/
+
+static PyObject *
+_make_padding_enum(void)
+{
+    PyObject *enum_mod = NULL, *Enum = NULL, *members = NULL;
+    PyObject *args = NULL, *kwargs = NULL, *result = NULL;
+
+    enum_mod = PyImport_ImportModule("enum");
+    if (enum_mod == NULL)
+        return NULL;
+    Enum = PyObject_GetAttrString(enum_mod, "Enum");
+    if (Enum == NULL)
+        goto done;
+    members = Py_BuildValue("{s:s,s:s,s:s}",
+                            "PKCS7_4_MIN8", "pkcs7_4_min8",
+                            "PKCS7_8", "pkcs7_8",
+                            "NONE", "none");
+    if (members == NULL)
+        goto done;
+    args = Py_BuildValue("(sO)", "Padding", members);
+    if (args == NULL)
+        goto done;
+    kwargs = Py_BuildValue("{s:O,s:s}",
+                           "type", (PyObject *)&PyUnicode_Type,
+                           "module", "xxtea");
+    if (kwargs == NULL)
+        goto done;
+    result = PyObject_Call(Enum, args, kwargs);
+
+done:
+    Py_XDECREF(enum_mod);
+    Py_XDECREF(Enum);
+    Py_XDECREF(members);
+    Py_XDECREF(args);
+    Py_XDECREF(kwargs);
+    return result;
+}
+
+static int
+_add_padding_member(PyObject *module, PyObject *type,
+                    PyObject *padding_enum, const char *name)
+{
+    PyObject *member = PyObject_GetAttrString(padding_enum, name);
+    if (member == NULL)
+        return -1;
+    if (PyObject_SetAttrString(type, name, member) < 0) {
+        Py_DECREF(member);
+        return -1;
+    }
+    if (PyModule_AddObject(module, name, member) < 0) {
+        Py_DECREF(member);
+        return -1;
+    }
+    return 0;
+}
 
 static int _exec(PyObject *module)
 {
@@ -864,21 +1044,48 @@ static int _exec(PyObject *module)
     if (PyModule_AddStringConstant(module, "VERSION", VERSION) < 0)
         return -1;
 
+    PyObject *padding_enum = _make_padding_enum();
+    if (padding_enum == NULL)
+        return -1;
+    if (PyModule_AddObject(module, "Padding", padding_enum) < 0) {
+        Py_DECREF(padding_enum);
+        return -1;
+    }
+
     PyObject *xxtea_type = PyType_FromModuleAndSpec(module, &xxtea_type_spec, NULL);
     if (xxtea_type == NULL)
         return -1;
 
+    if (PyObject_SetAttrString(xxtea_type, "Padding", padding_enum) < 0) {
+        Py_DECREF(xxtea_type);
+        return -1;
+    }
+    if (_add_padding_member(module, xxtea_type, padding_enum, "PKCS7_4_MIN8") < 0) {
+        Py_DECREF(xxtea_type);
+        return -1;
+    }
+    if (_add_padding_member(module, xxtea_type, padding_enum, "PKCS7_8") < 0) {
+        Py_DECREF(xxtea_type);
+        return -1;
+    }
+
 #if PY_VERSION_HEX >= 0x03090000
     /*
-     * Hook up the vectorcall constructor.  PyType_Type.tp_vectorcall_offset
-     * points to tp_vectorcall in PyTypeObject (since 3.9), so
-     * _PyVectorcall_Function reads xxtea_type->tp_vectorcall directly.
+     * Hook up the vectorcall constructor.  Since 3.9, PyType_Type sets its
+     * tp_vectorcall_offset to the offset of tp_vectorcall within
+     * PyTypeObject, so _PyVectorcall_Function reads xxtea_type->tp_vectorcall
+     * directly.
      *
      * The flag is set here (not in PyType_Spec) to avoid a 3.12+
      * debug-build assertion on heap types without tp_vectorcall_offset.
      */
     ((PyTypeObject *)xxtea_type)->tp_flags |= Py_TPFLAGS_HAVE_VECTORCALL;
     ((PyTypeObject *)xxtea_type)->tp_vectorcall = xxtea_vectorcall;
+#endif
+#if PY_VERSION_HEX >= 0x030c0000
+    /* Set after attaching Padding constants; the spec cannot include
+     * IMMUTABLETYPE because that blocks SetAttr on the new heap type. */
+    ((PyTypeObject *)xxtea_type)->tp_flags |= Py_TPFLAGS_IMMUTABLETYPE;
 #endif
 
     if (PyDict_SetItemString(PyModule_GetDict(module), "XXTEA", xxtea_type) < 0) {

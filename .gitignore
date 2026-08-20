@@ -1,4 +1,6 @@
-*.py[co]
+*.py[cod]
+*.so
+.venv/
 
 # Packages
 *.egg
@@ -22,6 +24,3 @@ pip-log.txt
 
 #Translations
 *.mo
-
-#Mr Developer
-.mr.developer.cfg

@@ -64,6 +64,12 @@ class TestVectorcall(unittest.TestCase):
         c = xxtea.XXTEA(b'0123456789abcdef', padding=True)
         self.assertEqual(c.encrypt(b'12345678'), xxtea.encrypt(b'12345678', b'0123456789abcdef'))
 
+    def test_padding_pkcs7_8(self):
+        key = b'0123456789abcdef'
+        c = xxtea.XXTEA(key, padding=xxtea.Padding.PKCS7_8)
+        self.assertEqual(c.encrypt(b'12345678'),
+                         xxtea.encrypt(b'12345678', key, padding=xxtea.PKCS7_8))
+
 
 if __name__ == '__main__':
     unittest.main()

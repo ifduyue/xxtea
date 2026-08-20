@@ -22,8 +22,8 @@ xxtea |github-actions-badge| |pypi-badge| |supported-pythons-badge| |license-bad
     :alt: CodSpeed
 
 .. _XXTEA: http://en.wikipedia.org/wiki/XXTEA
-.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L136
-.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L94
+.. _longs2bytes: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L160
+.. _bytes2longs: https://github.com/ifduyue/xxtea/blob/master/xxtea.c#L91
 .. _PKCS#7: http://en.wikipedia.org/wiki/Padding_%28cryptography%29#PKCS7
 
 XXTEA_ implemented as a Python extension module, licensed under 2-clause BSD.
@@ -35,20 +35,19 @@ not compatible with each other.
 
 In this implementation,  the conversions between bytes and array are
 taken care of by longs2bytes_ and bytes2longs_. A non-standard 4-byte block
-`PKCS#7`_ padding is used to make sure that the input bytes are padded to
-a multiple of 4-byte (the size of a 32-bit integer) and at least 8-byte long
-(the size of two 32-bit integers, which is required by the XXTEA_ algorithm).
-As a result of these measures, you can encrypt not only texts, but also any
-binary bytes of any length.
+`PKCS#7`_ padding is used by default to make sure that the input bytes are
+padded to a multiple of 4-byte (the size of a 32-bit integer) and at least
+8-byte long (the size of two 32-bit integers, which is required by the
+XXTEA_ algorithm). As a result of these measures, you can encrypt not only
+texts, but also any binary bytes of any length.
 
 .. note::
 
-   This implementation uses a **non-standard** 4-byte block PKCS#7 padding
-   instead of the conventional 8-byte or 16-byte block.  For inputs shorter
-   than 4 bytes, a non-standard hack pads an extra 4 bytes (producing
-   pad values 5–8) to satisfy XXTEA's 2-word minimum.  This means the
-   output is **NOT** compatible with other XXTEA implementations.
-   Pass ``padding=False`` for raw XXTEA (requires data length ≥ 8 and
+   The default (``"pkcs7_4_min8"``) is **not** standard 4-byte PKCS#7.
+   For inputs shorter than 4 bytes it pads an extra 4 bytes (pad values
+   5–8) to satisfy XXTEA's 2-word minimum. Pass ``padding="pkcs7_8"`` for
+   standard 8-byte PKCS#7 (compatible with Python xxteang), or
+   ``padding=False`` for raw XXTEA (requires data length ≥ 8 and
    multiple of 4).
 
 
@@ -82,8 +81,6 @@ reusable cipher objects.
     True
     >>>
     >>> hexenc = xxtea.encrypt_hex(s, key)
-    >>> hexenc
-    b'7ad85672d770fb5cf636c49d57e732ae'
     >>> s == xxtea.decrypt_hex(hexenc, key)
     True
     >>>
@@ -99,7 +96,7 @@ so you can encrypt and decrypt multiple times without passing them each call.
 
 .. code-block:: python
 
-    >>> from xxtea import XXTEA
+    >>> from xxtea import XXTEA, Padding
     >>>
     >>> cipher = XXTEA(key, padding=False, rounds=128)
     >>> cipher
@@ -120,9 +117,10 @@ They are stored on the object and used by every ``encrypt()``, ``decrypt()``,
 
 .. code-block:: python
 
-    >>> c = XXTEA(key)                          # rounds=0, padding=True
-    >>> c = XXTEA(key, rounds=64)         # override rounds
-    >>> c = XXTEA(key, padding=False)     # disable padding
+    >>> c = XXTEA(key)                                 # rounds=0, padding=Padding.PKCS7_4_MIN8
+    >>> c = XXTEA(key, rounds=64)                      # override rounds
+    >>> c = XXTEA(key, padding=False)                  # disable padding
+    >>> c = XXTEA(key, padding=Padding.PKCS7_8)        # 8-byte PKCS#7
     >>> c = XXTEA(key, padding=False, rounds=42)
 
 
@@ -139,26 +137,46 @@ representation. They are exactly equivalent to:
 Padding
 ---------
 
-Padding is enabled by default, using a **non-standard 4-byte block PKCS#7**
-scheme.  The pad byte value is ``4 - (len(data) & 3)`` (range 1–4), plus an
-extra 4 bytes when the input is shorter than 4 bytes to meet XXTEA's 2-word
-minimum (producing pad values 5–8).
+``padding`` is an ``xxtea.Padding`` enum (a ``str`` enum), so more
+schemes can be added later. Strings, ``True``, and ``False`` still work:
 
-Because padding always adds at least one byte, encrypting an 8-byte input
-produces a 12-byte ciphertext.  This is incompatible with other XXTEA
-implementations that use a standard block size or skip padding altogether.
-Use ``padding=False`` for raw, unpadded XXTEA.
+* ``True`` / ``Padding.PKCS7_4_MIN8`` / ``"pkcs7_4_min8"`` (default):
+  4-byte PKCS#7-like, padded to at least 8 bytes. Compatible with
+  previous versions of this package. Not standard 4-byte PKCS#7.
+* ``Padding.PKCS7_8`` / ``"pkcs7_8"``: Standard **8-byte** PKCS#7,
+  compatible with Python `xxteang <https://github.com/ifduyue/xxteang>`_.
+* ``False`` / ``None`` / ``Padding.NONE`` / ``"none"``: No padding (raw XXTEA).
+
+``xxtea.PKCS7_4_MIN8`` and ``xxtea.PKCS7_8`` are aliases for the enum
+members. They are also available as ``XXTEA.PKCS7_4_MIN8`` and
+``XXTEA.PKCS7_8``.
+
+Unknown scheme names raise ``ValueError``. Other values still follow
+Python truthiness for compatibility (``0`` / ``""`` / empty containers
+disable padding; ``1`` and other truthy non-strings use the default
+scheme), but emit a ``DeprecationWarning`` and will be removed in the
+next major version. Use ``True``, ``False``, ``None``, or ``Padding``.
+
+The default ``"pkcs7_4_min8"`` scheme uses pad byte value
+``4 - (len(data) & 3)`` (range 1–4), plus an extra 4 bytes when the
+input is shorter than 4 bytes to meet XXTEA's 2-word minimum
+(producing pad values 5–8). Standard 4-byte PKCS#7 never uses pad
+values 5–8. Because padding always adds at least one byte, encrypting
+an 8-byte input produces a 12-byte ciphertext.
+
+8-byte PKCS#7 uses pad byte value ``8 - (len(data) & 7)`` (range 1–8).
+Encrypting an 8-byte input produces a 16-byte ciphertext.
 
 .. code-block:: python
 
-    >>> xxtea.encrypt_hex('', key)
-    b'd63256eb59134f1f'
-    >>> xxtea.decrypt_hex(_, key)
+    >>> xxtea.decrypt_hex(xxtea.encrypt_hex(b'', key), key)
     b''
-    >>> xxtea.encrypt_hex(' ', key)
-    b'97009bd24074a7a5'
-    >>> xxtea.decrypt_hex(_, key)
+    >>> xxtea.decrypt_hex(xxtea.encrypt_hex(b' ', key), key)
     b' '
+    >>> len(xxtea.encrypt(b'12345678', key))                          # PKCS7_4_MIN8
+    12
+    >>> len(xxtea.encrypt(b'12345678', key, padding=xxtea.PKCS7_8))   # PKCS7_8
+    16
 
 You can disable padding by setting padding parameter to ``False``.
 In this case data will not be padded, so data length must be a multiple of 4 bytes and must not be less than 8 bytes.
@@ -166,13 +184,11 @@ Otherwise ``ValueError`` will be raised:
 
 .. code-block:: python
 
-    >>> xxtea.encrypt_hex('', key, padding=False)
+    >>> xxtea.encrypt_hex(b'', key, padding=False)
     ValueError: Data length must be a multiple of 4 bytes and must not be less than 8 bytes
-    >>> xxtea.encrypt_hex('xxtea is good', key, padding=False)
+    >>> xxtea.encrypt_hex(b'xxtea is good', key, padding=False)
     ValueError: Data length must be a multiple of 4 bytes and must not be less than 8 bytes
-    >>> xxtea.encrypt_hex('12345678', key, padding=False)
-    b'64f4e969ba90d386'
-    >>> xxtea.decrypt_hex(_, key, padding=False)
+    >>> xxtea.decrypt_hex(xxtea.encrypt_hex(b'12345678', key, padding=False), key, padding=False)
     b'12345678'
 
 
@@ -191,8 +207,8 @@ Do note that the more rounds it is, the more time will be consumed.
 
     >>> import xxtea
     >>> import string
-    >>> data = string.digits
-    >>> key = string.ascii_letters[:16]
+    >>> data = string.digits.encode()
+    >>> key = string.ascii_letters[:16].encode()
     >>> xxtea.encrypt_hex(data, key)
     b'5b80b08a5d1923e4cd992dd5'
     >>> 6 + 52 // ((len(data) + (4 - 1)) // 4)  # 4 means 4 bytes, size of a 32-bit integer
@@ -207,11 +223,13 @@ Catching Exceptions
 ---------------------
 
 When calling these functions, a ``ValueError``, ``TypeError``, or ``OverflowError``
-may be raised:
+may be raised.  Note that invalid hex input raises ``binascii.Error``, which is
+a subclass of ``ValueError``:
 
 .. code-block:: python
 
     >>> import xxtea
+    >>> from xxtea import XXTEA
     >>>
     >>> def try_catch(func, *args, **kwargs):
     ...     try:
@@ -221,18 +239,18 @@ may be raised:
     ...
     ...
     ...
-    >>> try_catch(xxtea.decrypt, '', key='')
+    >>> try_catch(xxtea.decrypt, b'', key=b'')
     ValueError : Need a 16-byte key.
-    >>> try_catch(xxtea.decrypt, '', key=' '*16)
-    ValueError : Invalid data, data length is not a multiple of 4, or less than 8.
-    >>> try_catch(xxtea.decrypt, ' '*8, key=' '*16)
-    ValueError : Invalid data, illegal PKCS#7 padding. Could be using a wrong key.
-    >>> try_catch(xxtea.decrypt_hex, ' '*8, key=' '*16)
-    TypeError : Non-hexadecimal digit found
-    >>> try_catch(xxtea.decrypt_hex, 'abc', key=' '*16)
-    TypeError : Odd-length string
-    >>> try_catch(xxtea.decrypt_hex, 'abcd', key=' '*16)
-    ValueError : Invalid data, data length is not a multiple of 4, or less than 8.
+    >>> try_catch(xxtea.decrypt, b'', key=b' '*16)
+    ValueError : Data length must be a multiple of 4 bytes and must not be less than 8 bytes
+    >>> try_catch(xxtea.decrypt, b' '*8, key=b' '*16)
+    ValueError : Invalid data, illegal padding. Could be using a wrong key.
+    >>> try_catch(xxtea.decrypt_hex, b' '*8, key=b' '*16)
+    Error : Non-hexadecimal digit found
+    >>> try_catch(xxtea.decrypt_hex, b'abc', key=b' '*16)
+    Error : Odd-length string
+    >>> try_catch(xxtea.decrypt_hex, b'abcd', key=b' '*16)
+    ValueError : Data length must be a multiple of 4 bytes and must not be less than 8 bytes
     >>> try_catch(xxtea.encrypt, b'x', b'k'*16, rounds=2**32)
     OverflowError : rounds value too large
     >>> try_catch(XXTEA, key=b'short')

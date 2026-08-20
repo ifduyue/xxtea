@@ -665,7 +665,9 @@ class TestXXTEAType(unittest.TestCase):
 
     def test_padding_construction(self):
         key = os.urandom(16)
-        for padding in (True, False):
+        for padding in (True, False, 'pkcs7_4_min8', 'pkcs7_8', 'none',
+                        xxtea.Padding.PKCS7_4_MIN8, xxtea.Padding.PKCS7_8,
+                        xxtea.Padding.NONE, xxtea.PKCS7_8):
             cipher = xxtea.XXTEA(key, padding=padding)
             self.assertEqual(cipher.decrypt(cipher.encrypt(b'12345678')), b'12345678')
 
