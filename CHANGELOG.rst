@@ -1,7 +1,7 @@
 CHANGELOG
 --------------
 
-v6.0.0.dev0
+v6.0.0 2026/08/21
 ~~~~~~~~~~~~~~~~~~~
 
 - Add ``xxtea.Padding`` ``str`` enum: ``PKCS7_4_MIN8`` (default),
