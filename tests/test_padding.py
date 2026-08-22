@@ -155,6 +155,7 @@ class TestPadding8(unittest.TestCase):
             with self.assertWarns(DeprecationWarning) as cm:
                 enc = xxtea.encrypt(data, key, padding=padding)
             self.assertIn('next major version', str(cm.warning))
+            self.assertIn('LENGTH_WORD_SUFFIX', str(cm.warning))
             return enc
 
         self.assertEqual(enc_false, legacy_encrypt(0))
@@ -173,6 +174,25 @@ class TestPadding8(unittest.TestCase):
             cipher = xxtea.XXTEA(key, padding=0)
         self.assertEqual(enc_false, cipher.encrypt(data))
 
+    def test_value_getter_errors_are_not_swallowed(self):
+        key = os.urandom(16)
+        data = os.urandom(32)
+
+        class Boom:
+            @property
+            def value(self):
+                raise RuntimeError('boom')
+
+        with self.assertRaises(RuntimeError):
+            xxtea.encrypt(data, key, padding=Boom())
+
+        class NoValue:
+            pass
+
+        with self.assertWarns(DeprecationWarning):
+            enc = xxtea.encrypt(data, key, padding=NoValue())
+        self.assertEqual(enc, xxtea.encrypt(data, key, padding=True))
+
     def test_standard_padding_does_not_warn(self):
         key = os.urandom(16)
         data = os.urandom(32)
@@ -187,6 +207,7 @@ class TestPadding8(unittest.TestCase):
             xxtea.encrypt(data, key, padding=xxtea.Padding.PKCS7_4_MIN8)
             xxtea.encrypt(data, key, padding=xxtea.Padding.PKCS7_8)
             xxtea.encrypt(data, key, padding=xxtea.Padding.NONE)
+            xxtea.encrypt(data, key, padding=xxtea.LENGTH_WORD_SUFFIX)
             xxtea.XXTEA(key, padding=True)
             xxtea.XXTEA(key, padding=None)
             xxtea.XXTEA(key, padding=xxtea.PKCS7_8)

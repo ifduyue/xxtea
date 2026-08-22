@@ -1,6 +1,16 @@
 CHANGELOG
 --------------
 
+Unreleased
+~~~~~~~~~~~~~~~~~~~
+
+- Add ``Padding.LENGTH_WORD_SUFFIX`` (``"length_word_suffix"``): zero-pad
+  to a 4-byte boundary and append one little-endian ``uint32`` length
+  word. Cocos Creator JSC files using this layout can be decrypted.
+  Empty input is padded to 8 bytes (XXTEA's 2-word minimum). Plaintext
+  longer than ``2**32 - 1`` bytes is rejected. ``xxtea.LENGTH_WORD_SUFFIX``
+  and ``XXTEA.LENGTH_WORD_SUFFIX`` are aliases.
+
 v6.0.0 2026/08/21
 ~~~~~~~~~~~~~~~~~~~
 

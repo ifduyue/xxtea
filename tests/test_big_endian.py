@@ -34,6 +34,17 @@ class TestBigEndianInPlaceLongs2Bytes(unittest.TestCase):
             dec = xxtea.decrypt(enc, key)
             self.assertEqual(dec, data, f'failed for length={length}')
 
+    def test_length_word_suffix(self):
+        key = b'0123456789abcdef'
+        for length in range(0, 256):
+            data = bytes((i * 7 + 13) & 0xff for i in range(length))
+            enc = xxtea.encrypt(data, key, padding='length_word_suffix')
+            dec = xxtea.decrypt(enc, key, padding='length_word_suffix')
+            self.assertEqual(dec, data, f'failed for length={length}')
+            raw = xxtea.decrypt(enc, key, padding=False)
+            self.assertEqual(length, int.from_bytes(raw[-4:], 'little'),
+                             f'length word not little-endian at length={length}')
+
 
 if __name__ == '__main__':
     unittest.main()

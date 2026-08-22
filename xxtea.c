@@ -36,6 +36,7 @@
 
 enum {
     XXTEA_PADDING_NONE = 0,
+    XXTEA_PADDING_LENGTH_WORD_SUFFIX = 1,
     XXTEA_PADDING_PKCS7_4_MIN8 = 4,
     XXTEA_PADDING_PKCS7_8 = 8,
 };
@@ -114,6 +115,31 @@ static void bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, int pad
 
     i = nwords << 2;
 
+    if (padding == XXTEA_PADDING_LENGTH_WORD_SUFFIX) {
+        /*
+         * Length-word suffix, the layout used by Cocos Creator JSC
+         * files: zero-pad the final partial word, then append one word
+         * holding the original byte length.  XXTEA needs two words, so
+         * empty input gets an extra zero word before the length word.
+         */
+        uint32_t w = 0;
+        int shift = 0;
+        for (; i < inlen; i++, shift += 8) {
+            w |= (uint32_t)s[i] << shift;
+        }
+        if ((inlen & 3) != 0) {
+            out[nwords] = w;
+            nwords++;
+        }
+        if (nwords < 1) {
+            out[nwords++] = 0;
+        }
+        /* Numeric uint32, not memcpy(&inlen): 64-bit big-endian would
+         * copy the high half.  Ciphertext length word is little-endian. */
+        out[nwords] = (uint32_t)inlen;
+        return;
+    }
+
     if (padding == XXTEA_PADDING_PKCS7_8) {
         /*
          * 8-byte PKCS#7 (xxteang): pad = 8 - (len & 7), range 1-8.
@@ -188,8 +214,29 @@ static Py_ssize_t longs2bytes(const uint32_t *in, Py_ssize_t inlen, char *out, i
 
     outlen = inlen * 4;
 
+    /* Length-word suffix: the last word is the original byte length. */
+    if (padding == XXTEA_PADDING_LENGTH_WORD_SUFFIX) {
+        Py_ssize_t n = outlen - 4;
+        Py_ssize_t leftover;
+        uint32_t m32 = (uint32_t)s[n] | ((uint32_t)s[n + 1] << 8) |
+                       ((uint32_t)s[n + 2] << 16) | ((uint32_t)s[n + 3] << 24);
+        leftover = n - (Py_ssize_t)m32;
+        /* 0-3 zero-pad bytes, or 4 zero bytes when empty input was
+         * padded to the XXTEA 2-word minimum. */
+        if (m32 > (uint32_t)n || leftover < 0 ||
+            (leftover > 3 && !(m32 == 0 && leftover == 4))) {
+            /* invalid padding */
+            return -1;
+        }
+        for (i = (Py_ssize_t)m32; i < n; i++) {
+            if (s[i] != 0) {
+                return -1;
+            }
+        }
+        outlen = (Py_ssize_t)m32;
+    }
     /* PKCS#7-style unpadding (4-byte or 8-byte; pad values 1-8). */
-    if (padding) {
+    else if (padding) {
         pad = s[outlen - 1];
         outlen -= pad;
 
@@ -241,7 +288,7 @@ _warn_legacy_padding(PyObject *obj)
     return PyErr_WarnFormat(
         PyExc_DeprecationWarning, 1,
         "padding=%R is deprecated; use True, False, None, or xxtea.Padding "
-        "(PKCS7_4_MIN8, PKCS7_8, NONE). "
+        "(PKCS7_4_MIN8, PKCS7_8, LENGTH_WORD_SUFFIX, NONE). "
         "This will be removed in the next major version.",
         obj);
 }
@@ -263,13 +310,17 @@ _parse_padding_name(PyObject *name, int *padding)
         *padding = XXTEA_PADDING_PKCS7_8;
         return 0;
     }
+    if (PyUnicode_CompareWithASCIIString(name, "length_word_suffix") == 0) {
+        *padding = XXTEA_PADDING_LENGTH_WORD_SUFFIX;
+        return 0;
+    }
     if (PyUnicode_CompareWithASCIIString(name, "none") == 0) {
         *padding = XXTEA_PADDING_NONE;
         return 0;
     }
     PyErr_Format(PyExc_ValueError,
         "unknown padding %R (expected Padding.NONE, Padding.PKCS7_4_MIN8, "
-        "or Padding.PKCS7_8)",
+        "Padding.PKCS7_8, or Padding.LENGTH_WORD_SUFFIX)",
         name);
     return -1;
 }
@@ -300,8 +351,11 @@ _parse_padding(PyObject *obj, int *padding)
         }
         Py_DECREF(value);
     }
-    else {
+    else if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
+    }
+    else {
+        return -1;
     }
 
     /* Historical: any other object uses truthiness (0/empty → none,
@@ -472,7 +526,26 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
     }
 
     Py_ssize_t alen;
-    if (padding == XXTEA_PADDING_PKCS7_8) {
+    if (padding == XXTEA_PADDING_LENGTH_WORD_SUFFIX) {
+        /* Length word is uint32.  Compiled out on 32-bit, where
+         * Py_ssize_t cannot exceed UINT32_MAX (the comparison would
+         * warn as always false). */
+#if SIZEOF_SIZE_T > 4
+        if ((size_t)data_len > 0xFFFFFFFFu) {
+            PyErr_SetString(PyExc_OverflowError, "data too large");
+            return NULL;
+        }
+#endif
+        if (data_len > PY_SSIZE_T_MAX - 4) {
+            PyErr_SetString(PyExc_OverflowError, "data too large");
+            return NULL;
+        }
+        alen = (data_len >> 2) + ((data_len & 3) != 0) + 1;
+        if (alen < 2) {
+            alen = 2;
+        }
+    }
+    else if (padding == XXTEA_PADDING_PKCS7_8) {
         if (data_len > PY_SSIZE_T_MAX - 8) {
             PyErr_SetString(PyExc_OverflowError, "data too large");
             return NULL;
@@ -577,7 +650,7 @@ PyDoc_STRVAR(
     "encrypt(data, key, padding=True, rounds=0)\n\n"
     "Encrypt bytes-like data with a 16-byte key and return bytes.\n"
     "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
-    "or False/None/Padding.NONE.");
+    "Padding.LENGTH_WORD_SUFFIX, or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_encrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -591,7 +664,7 @@ PyDoc_STRVAR(
     "encrypt_hex(data, key, padding=True, rounds=0)\n\n"
     "Encrypt bytes-like data with a 16-byte key and return hex-encoded bytes.\n"
     "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
-    "or False/None/Padding.NONE.");
+    "Padding.LENGTH_WORD_SUFFIX, or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_encrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -612,7 +685,7 @@ PyDoc_STRVAR(
     "decrypt(data, key, padding=True, rounds=0)\n\n"
     "Decrypt bytes-like data with a 16-byte key and return bytes.\n"
     "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
-    "or False/None/Padding.NONE.");
+    "Padding.LENGTH_WORD_SUFFIX, or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_decrypt(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -626,7 +699,7 @@ PyDoc_STRVAR(
     "decrypt_hex(data, key, padding=True, rounds=0)\n\n"
     "Decrypt hex-encoded data with a 16-byte key and return bytes.\n"
     "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
-    "or False/None/Padding.NONE.");
+    "Padding.LENGTH_WORD_SUFFIX, or False/None/Padding.NONE.");
 
 static PyObject *
 xxtea_decrypt_hex(PyObject *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
@@ -941,7 +1014,7 @@ static PyType_Slot xxtea_type_slots[] = {
                 "XXTEA cipher object.  rounds=0 means auto: 6 + 52 / n, "
                 "where n is the number of 32-bit words in the data.\n"
                 "padding: True/Padding.PKCS7_4_MIN8 (default), Padding.PKCS7_8, "
-                "or False/None/Padding.NONE.\n"
+                "Padding.LENGTH_WORD_SUFFIX, or False/None/Padding.NONE.\n"
                 "Methods: encrypt(data), decrypt(data), "
                 "encrypt_hex(data), decrypt_hex(data)."},
     {Py_tp_methods, xxtea_object_methods},
@@ -973,9 +1046,10 @@ _make_padding_enum(void)
     Enum = PyObject_GetAttrString(enum_mod, "Enum");
     if (Enum == NULL)
         goto done;
-    members = Py_BuildValue("{s:s,s:s,s:s}",
+    members = Py_BuildValue("{s:s,s:s,s:s,s:s}",
                             "PKCS7_4_MIN8", "pkcs7_4_min8",
                             "PKCS7_8", "pkcs7_8",
+                            "LENGTH_WORD_SUFFIX", "length_word_suffix",
                             "NONE", "none");
     if (members == NULL)
         goto done;
@@ -1065,6 +1139,10 @@ static int _exec(PyObject *module)
         return -1;
     }
     if (_add_padding_member(module, xxtea_type, padding_enum, "PKCS7_8") < 0) {
+        Py_DECREF(xxtea_type);
+        return -1;
+    }
+    if (_add_padding_member(module, xxtea_type, padding_enum, "LENGTH_WORD_SUFFIX") < 0) {
         Py_DECREF(xxtea_type);
         return -1;
     }
