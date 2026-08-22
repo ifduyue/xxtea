@@ -1,7 +1,7 @@
 CHANGELOG
 --------------
 
-Unreleased
+v6.1.0 2026/08/22
 ~~~~~~~~~~~~~~~~~~~
 
 - Add ``Padding.LENGTH_WORD_SUFFIX`` (``"length_word_suffix"``): zero-pad
