@@ -178,7 +178,7 @@ class TestLengthWordSuffix(unittest.TestCase):
         key = b'k' * 16
         data = b'12345678'
         for name in ('length_word', 'LENGTH_WORD_SUFFIX', 'length-word-suffix',
-                     'length_word_prefix'):
+                     'length-word-prefix'):
             with self.assertRaises(ValueError):
                 xxtea.encrypt(data, key, padding=name)
 

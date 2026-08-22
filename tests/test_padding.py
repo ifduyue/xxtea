@@ -155,6 +155,7 @@ class TestPadding8(unittest.TestCase):
             with self.assertWarns(DeprecationWarning) as cm:
                 enc = xxtea.encrypt(data, key, padding=padding)
             self.assertIn('next major version', str(cm.warning))
+            self.assertIn('LENGTH_WORD_PREFIX', str(cm.warning))
             self.assertIn('LENGTH_WORD_SUFFIX', str(cm.warning))
             return enc
 
@@ -208,6 +209,7 @@ class TestPadding8(unittest.TestCase):
             xxtea.encrypt(data, key, padding=xxtea.Padding.PKCS7_8)
             xxtea.encrypt(data, key, padding=xxtea.Padding.NONE)
             xxtea.encrypt(data, key, padding=xxtea.LENGTH_WORD_SUFFIX)
+            xxtea.encrypt(data, key, padding=xxtea.LENGTH_WORD_PREFIX)
             xxtea.XXTEA(key, padding=True)
             xxtea.XXTEA(key, padding=None)
             xxtea.XXTEA(key, padding=xxtea.PKCS7_8)

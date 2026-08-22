@@ -145,6 +145,11 @@ schemes can be added later. Strings, ``True``, and ``False`` still work:
   previous versions of this package. Not standard 4-byte PKCS#7.
 * ``Padding.PKCS7_8`` / ``"pkcs7_8"``: Standard **8-byte** PKCS#7,
   compatible with Python `xxteang <https://github.com/ifduyue/xxteang>`_.
+* ``Padding.LENGTH_WORD_PREFIX`` / ``"length_word_prefix"``: prepend one
+  little-endian ``uint32`` with the original length, then zero-pad the
+  data to a 4-byte boundary. Empty input is padded to 8 bytes so XXTEA's
+  2-word minimum is met (plaintext length must fit in a 32-bit unsigned
+  integer).
 * ``Padding.LENGTH_WORD_SUFFIX`` / ``"length_word_suffix"``: zero-pad to
   a 4-byte boundary, then append one little-endian ``uint32`` with the
   original length. Cocos Creator JSC files using this layout can be
@@ -152,9 +157,10 @@ schemes can be added later. Strings, ``True``, and ``False`` still work:
   is met (plaintext length must fit in a 32-bit unsigned integer).
 * ``False`` / ``None`` / ``Padding.NONE`` / ``"none"``: No padding (raw XXTEA).
 
-``xxtea.PKCS7_4_MIN8``, ``xxtea.PKCS7_8``, and ``xxtea.LENGTH_WORD_SUFFIX``
-are aliases for the enum members. They are also available as
-``XXTEA.PKCS7_4_MIN8``, ``XXTEA.PKCS7_8``, and ``XXTEA.LENGTH_WORD_SUFFIX``.
+``xxtea.PKCS7_4_MIN8``, ``xxtea.PKCS7_8``, ``xxtea.LENGTH_WORD_PREFIX``,
+and ``xxtea.LENGTH_WORD_SUFFIX`` are aliases for the enum members. They
+are also available as ``XXTEA.PKCS7_4_MIN8``, ``XXTEA.PKCS7_8``,
+``XXTEA.LENGTH_WORD_PREFIX``, and ``XXTEA.LENGTH_WORD_SUFFIX``.
 
 Unknown scheme names raise ``ValueError``. Other values still follow
 Python truthiness for compatibility (``0`` / ``""`` / empty containers

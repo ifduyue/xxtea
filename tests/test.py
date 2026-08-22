@@ -668,7 +668,8 @@ class TestXXTEAType(unittest.TestCase):
         for padding in (True, False, 'pkcs7_4_min8', 'pkcs7_8', 'none',
                         xxtea.Padding.PKCS7_4_MIN8, xxtea.Padding.PKCS7_8,
                         xxtea.Padding.NONE, xxtea.PKCS7_8,
-                        xxtea.Padding.LENGTH_WORD_SUFFIX, xxtea.LENGTH_WORD_SUFFIX):
+                        xxtea.Padding.LENGTH_WORD_SUFFIX, xxtea.LENGTH_WORD_SUFFIX,
+                        xxtea.Padding.LENGTH_WORD_PREFIX, xxtea.LENGTH_WORD_PREFIX):
             cipher = xxtea.XXTEA(key, padding=padding)
             self.assertEqual(cipher.decrypt(cipher.encrypt(b'12345678')), b'12345678')
 

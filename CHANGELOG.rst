@@ -1,6 +1,16 @@
 CHANGELOG
 --------------
 
+Unreleased
+~~~~~~~~~~~~~~~~~~~
+
+- Add ``Padding.LENGTH_WORD_PREFIX`` (``"length_word_prefix"``): prepend
+  one little-endian ``uint32`` length word, then zero-pad the data to a
+  4-byte boundary. Empty input is padded to 8 bytes (XXTEA's 2-word
+  minimum). Plaintext longer than ``2**32 - 1`` bytes is rejected.
+  ``xxtea.LENGTH_WORD_PREFIX`` and ``XXTEA.LENGTH_WORD_PREFIX`` are
+  aliases.
+
 v6.1.0 2026/08/22
 ~~~~~~~~~~~~~~~~~~~
 
