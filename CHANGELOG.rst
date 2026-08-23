@@ -1,7 +1,7 @@
 CHANGELOG
 --------------
 
-Unreleased
+v6.2.0 2026/08/23
 ~~~~~~~~~~~~~~~~~~~
 
 - Add ``Padding.LENGTH_WORD_PREFIX`` (``"length_word_prefix"``): prepend
