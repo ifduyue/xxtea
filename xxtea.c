@@ -101,15 +101,23 @@ static void bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, int pad
     Py_ssize_t i, nwords;
     int pad;
     const unsigned char *s = (const unsigned char *)in;
+    uint32_t *dst = out;
+
+    if (padding == XXTEA_PADDING_LENGTH_WORD_PREFIX) {
+        /* Numeric uint32, not memcpy(&inlen): 64-bit big-endian would
+         * copy the high half.  Ciphertext length word is little-endian. */
+        out[0] = (uint32_t)inlen;
+        dst = out + 1;
+    }
 
     /* Fast path: process 4 bytes at a time */
     nwords = inlen >> 2;
     for (i = 0; i < nwords; i++) {
 #if PY_LITTLE_ENDIAN
-        memcpy(&out[i], s + 4 * i, 4);
+        memcpy(&dst[i], s + 4 * i, 4);
 #else
         const unsigned char *p = s + 4 * i;
-        out[i] = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+        dst[i] = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
                  ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
 #endif
     }
@@ -130,20 +138,14 @@ static void bytes2longs(const char *in, Py_ssize_t inlen, uint32_t *out, int pad
             w |= (uint32_t)s[i] << shift;
         }
         if ((inlen & 3) != 0) {
-            out[nwords] = w;
+            dst[nwords] = w;
             nwords++;
         }
         if (nwords < 1) {
-            out[nwords++] = 0;
+            dst[nwords++] = 0;
         }
-        /* Numeric uint32, not memcpy(&inlen): 64-bit big-endian would
-         * copy the high half.  Ciphertext length word is little-endian. */
-        if (padding == XXTEA_PADDING_LENGTH_WORD_PREFIX) {
-            memmove(out + 1, out, (size_t)nwords * sizeof(uint32_t));
-            out[0] = (uint32_t)inlen;
-        }
-        else {
-            out[nwords] = (uint32_t)inlen;
+        if (padding == XXTEA_PADDING_LENGTH_WORD_SUFFIX) {
+            dst[nwords] = (uint32_t)inlen;
         }
         return;
     }
