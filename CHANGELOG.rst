@@ -1,12 +1,6 @@
 CHANGELOG
 --------------
 
-v3.6.1 2026/10/18
-~~~~~~~~~~~~~~~~~~~
-
-- Build wheels for Python 3.15
-
-
 v5.3.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
 
@@ -187,6 +181,11 @@ v3.7.0 2025/11/28
 
 - Build linux riscv64 wheels
 - Build linux armv7l wheels
+
+v3.6.1 2026/10/18
+~~~~~~~~~~~~~~~~~~~
+
+- Build wheels for Python 3.15
 
 v3.6.0 2025/11/04
 ~~~~~~~~~~~~~~~~~~~
