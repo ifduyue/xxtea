@@ -1,12 +1,6 @@
 CHANGELOG
 --------------
 
-v5.1.4 2026/10/18
-~~~~~~~~~~~~~~~~~~~
-
-- Build wheels for Python 3.15
-
-
 v5.3.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
 
@@ -75,6 +69,11 @@ v5.2.0 2026/06/19
 - :class:`XXTEA` type now uses vectorcall for construction (Python ≥ 3.9),
   up to 2.9× faster for keyword arguments.
 - Rewrite argument parsing to share logic between vectorcall and ``tp_init``.
+
+v5.1.4 2026/10/18
+~~~~~~~~~~~~~~~~~~~
+
+- Build wheels for Python 3.15
 
 v5.1.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
