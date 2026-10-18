@@ -3,6 +3,6 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.cibuildwheel]
-# cpython-freethreading is appended by CIBW_ENABLE on the older builder.
-# cibuildwheel 4.3.1 rejects that group, and CIBW_ENABLE cannot remove it.
+# cpython-freethreading is job env for the older builder. cibuildwheel 4.3.1
+# rejects that group, and CIBW_ENABLE cannot remove it from this file.
 enable = ["pypy", "pypy-eol", "graalpy"]
