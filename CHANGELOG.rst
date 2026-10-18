@@ -1,12 +1,6 @@
 CHANGELOG
 --------------
 
-v5.2.4 2026/10/18
-~~~~~~~~~~~~~~~~~~~
-
-- Build wheels for Python 3.15
-
-
 v5.3.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
 
@@ -46,6 +40,11 @@ v5.3.0 2026/06/29
 - Unify ``rounds`` parsing between module functions and the :class:`XXTEA`
   constructor, both now use ``PyLong_AsUnsignedLong`` with an immediate
   ``UINT_MAX`` check.
+
+v5.2.4 2026/10/18
+~~~~~~~~~~~~~~~~~~~
+
+- Build wheels for Python 3.15
 
 v5.2.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
