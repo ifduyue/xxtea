@@ -1,12 +1,6 @@
 CHANGELOG
 --------------
 
-v3.8.1 2026/10/18
-~~~~~~~~~~~~~~~~~~~
-
-- Build wheels for Python 3.15
-
-
 v5.3.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
 
@@ -175,6 +169,11 @@ v4.0.0 2026/04/27
 - Reject excess positional args, duplicate arguments, and unknown keywords
 - Check PyObject_IsTrue error return in padding parsing
 - Drop support for Python 3.8
+
+v3.8.1 2026/10/18
+~~~~~~~~~~~~~~~~~~~
+
+- Build wheels for Python 3.15
 
 v3.8.0 2026/04/19
 ~~~~~~~~~~~~~~~~~~~
