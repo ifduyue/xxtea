@@ -3,4 +3,6 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.cibuildwheel]
-enable = ["cpython-freethreading", "pypy", "pypy-eol", "graalpy"]
+# cpython-freethreading is appended by CIBW_ENABLE on the older builder.
+# cibuildwheel 4.3.1 rejects that group, and CIBW_ENABLE cannot remove it.
+enable = ["pypy", "pypy-eol", "graalpy"]
