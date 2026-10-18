@@ -1,12 +1,6 @@
 CHANGELOG
 --------------
 
-v4.0.5 2026/10/18
-~~~~~~~~~~~~~~~~~~~
-
-- Build wheels for Python 3.15
-
-
 v5.3.3 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
 
@@ -141,6 +135,11 @@ v5.0.0 2026/05/08
 - Document non-standard 4-byte block PKCS#7 padding behaviour in README,
   including the ``pad+4`` hack for inputs < 4 bytes and compatibility note.
 - Add 4-byte and 8-byte edge case tests for non-standard PKCS#7 padding.
+
+v4.0.5 2026/10/18
+~~~~~~~~~~~~~~~~~~~
+
+- Build wheels for Python 3.15
 
 v4.0.4 2026/08/14
 ~~~~~~~~~~~~~~~~~~~
