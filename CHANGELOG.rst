@@ -1,6 +1,15 @@
 CHANGELOG
 --------------
 
+v6.3.0 2026/10/20
+~~~~~~~~~~~~~~~~~~~
+
+- Speed up short ``encrypt`` and ``decrypt`` calls by holding the GIL
+  until ``rounds`` times the number of words exceeds a 64 KiB block at
+  the default 6 rounds. A short buffer with a large ``rounds`` value
+  still releases the GIL.
+
+
 v6.2.0 2026/08/23
 ~~~~~~~~~~~~~~~~~~~
 
