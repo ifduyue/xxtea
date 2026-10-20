@@ -122,10 +122,14 @@ static inline void btea(uint32_t *v, int n, uint32_t const key[4], unsigned int 
 static inline void
 load_le_words(const unsigned char *src, Py_ssize_t nwords, uint32_t *dst)
 {
-#if PY_LITTLE_ENDIAN
-    memcpy(dst, src, (size_t)nwords * 4);
-#else
     Py_ssize_t i;
+#if PY_LITTLE_ENDIAN
+    /* A runtime-length memcpy stays a libc call. Its dispatch prologue
+     * shows up on the 10 KiB benchmarks. Four-byte copies inline. */
+    for (i = 0; i < nwords; i++) {
+        memcpy(&dst[i], src + 4 * i, 4);
+    }
+#else
     for (i = 0; i < nwords; i++) {
         const unsigned char *p = src + 4 * i;
         dst[i] = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
