@@ -44,13 +44,28 @@ enum {
 
 #define DELTA 0x9e3779b9U
 #define MX (((z>>5^y<<2) + (y>>3^z<<4)) ^ ((sum^y) + (key[(p&3)^e] ^ z)))
-/* Releasing the GIL around a few dozen bytes costs more than the cipher. */
-#define XXTEA_GIL_MINSIZE 65536
+/* One round visits every word.  Release the GIL once that exceeds a
+ * 64 KiB block at the default 6 rounds, so a large explicit rounds on
+ * a short buffer does not stall other threads. */
+#define XXTEA_GIL_MIN_WORK (6ull * (65536 / 4))
 
 static inline unsigned
 xxtea_round_count(unsigned int rounds, int nwords)
 {
     return rounds == 0 ? (unsigned)(6 + 52 / nwords) : rounds;
+}
+
+static inline int
+xxtea_release_gil(unsigned int rounds, Py_ssize_t nwords)
+{
+    unsigned long long work;
+
+    if (nwords < 2) {
+        return 0;
+    }
+    work = (unsigned long long)xxtea_round_count(rounds, (int)nwords)
+         * (unsigned long long)nwords;
+    return work > XXTEA_GIL_MIN_WORK;
 }
 
 typedef struct xxtea_mod_state {
@@ -657,7 +672,7 @@ _encrypt_impl(const char *data_buf, Py_ssize_t data_len,
 
     uint32_t *d = (uint32_t *)PyBytes_AsString(retval);
 
-    if (data_len > XXTEA_GIL_MINSIZE) {
+    if (xxtea_release_gil(rounds, alen)) {
         Py_BEGIN_ALLOW_THREADS
         encrypt_words(d, alen, data_buf, data_len, key_buf, padding, rounds);
         Py_END_ALLOW_THREADS
@@ -698,7 +713,7 @@ _decrypt_impl(const char *data_buf, Py_ssize_t data_len,
 
     uint32_t *words = (uint32_t *)PyBytes_AsString(retval);
     Py_ssize_t rc;
-    if (data_len > XXTEA_GIL_MINSIZE) {
+    if (xxtea_release_gil(rounds, alen)) {
         Py_BEGIN_ALLOW_THREADS
         rc = decrypt_words(words, alen, data_buf, data_len, key_buf, padding, rounds);
         Py_END_ALLOW_THREADS
