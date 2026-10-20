@@ -32,7 +32,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define VERSION "6.2.0"
+#define VERSION "6.3.0.dev0"
 
 enum {
     XXTEA_PADDING_NONE = 0,
