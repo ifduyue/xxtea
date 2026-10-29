@@ -148,7 +148,8 @@ jobs:
           fi
           PYTHON="$py" ./bench.sh
 
-  test-big-endian:
+  test-s390x:
+    name: test on s390x (64-bit big-endian, qemu via run-on-arch)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,7 +157,7 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Run tests on s390x (big-endian) via QEMU
+      - name: Run tests on s390x (64-bit big-endian, qemu via run-on-arch)
         uses: uraimo/run-on-arch-action@fa1f3e7de95534497266c7265950b5188355fbfb # v3.2.1
         with:
           arch: s390x
@@ -169,3 +170,35 @@ jobs:
             python3 -c "import sys; print('byteorder:', sys.byteorder)"
             python3 setup.py build_ext --inplace
             python3 -m unittest discover -vv tests
+
+  # run-on-arch-action's binfmt image has ppc64le only, not 32-bit big-endian ppc.
+  test-powerpc:
+    name: test on powerpc (32-bit big-endian, qemu via qemu-user-static)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Register qemu-user-static for powerpc
+        run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - name: Run tests on powerpc (32-bit big-endian, qemu via qemu-user-static)
+        run: |
+          docker run --rm --platform linux/ppc \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            urbanogilson/debian-debootstrap-ports:powerpc-forky-sid \
+            bash -lc 'set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              printf "%s\n" \
+                "deb http://deb.debian.org/debian-ports sid main" \
+                "deb http://deb.debian.org/debian-ports unreleased main" \
+                "deb [arch=all] http://deb.debian.org/debian sid main" \
+                >/etc/apt/sources.list
+              apt-get update -q -y
+              apt-get install -q -y python3 python3-dev python3-setuptools gcc
+              python3 -c "import sys; print(\"byteorder:\", sys.byteorder, \"maxsize:\", sys.maxsize); assert sys.byteorder == \"big\", sys.byteorder"
+              python3 setup.py build_ext --inplace
+              python3 -m unittest discover -vv tests'
